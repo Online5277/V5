@@ -49,11 +49,10 @@ class PestKiller {
     tick() {
         if (!this.running) return true;
         const { gardenPests, currentPlot, currentPlotPests } = Utils.getGardenPestStatus();
-        if (gardenPests === 0) {
+        if (gardenPests === null || gardenPests === 0) {
             this.stop();
             return true;
         }
-        if (gardenPests === null) return false;
         const infestedPlots = TabListUtils.readPests().infestedPlots;
         const pestsRemainInCurrentPlot = this.teleportedToPlot && this.currentPlot !== null && currentPlot === this.currentPlot ? currentPlotPests : null;
         if (pestsRemainInCurrentPlot === 0) {
