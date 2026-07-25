@@ -92,9 +92,8 @@ class PhilipMacro {
         Client.unpressKeys();
         this.transition(STATES.APPROACHING);
         Rotations.lookAtVector({ x: philip.getX(), y: philip.getY() + 1.62, z: philip.getZ() });
-        Rotations.onComplete(() => {
-            if (this.running && this.state === STATES.APPROACHING) Client.setKey('w', true);
-        });
+        Client.setKey('w', true);
+        Client.setKey('shift', true);
     }
 
     approach() {

@@ -495,6 +495,30 @@ class UtilsClass {
         return TabListUtils.hasCookie();
     }
 
+    getGardenPestStatus() {
+        let gardenPests = null;
+        let currentPlot = null;
+        let currentPlotPests = null;
+
+        try {
+            Scoreboard.getLines()?.forEach((line) => {
+                const text = ChatLib.removeFormatting(String(line.getName?.() ?? line)).trim();
+                const isGarden = text.includes('The Garden');
+                const gardenMatch = isGarden && text.match(/\bx\s*(\d+)\s*$/);
+                const plotMatch = text.match(/\bPlot\s*-\s*(\d+)(?:\s+.*?\bx\s*(\d+))?\s*$/);
+                if (isGarden) gardenPests = Number(gardenMatch?.[1] || 0);
+                if (plotMatch) {
+                    currentPlot = Number(plotMatch[1]);
+                    currentPlotPests = Number(plotMatch[2] || 0);
+                }
+            });
+        } catch (e) {
+            console.error('V5 Caught error' + e + e.stack);
+        }
+
+        return { gardenPests, currentPlot, currentPlotPests };
+    }
+
     getCurrentMana() {
         return manaDetector.getCurrentMana();
     }

@@ -81,7 +81,9 @@ export class FarmingMacro extends ModuleBase {
         if (!player) return;
 
         this.farmingSlot = Player.getHeldItemIndex();
-        loadoutHandler.select(loadoutHandler.farmingSlot);
+        loadoutHandler.select(
+            TabListUtils.getPestCooldown() <= loadoutHandler.pestSpawnSwapCooldown ? loadoutHandler.pestSpawningSlot : loadoutHandler.farmingSlot
+        );
         this.startFarming(player);
     }
 
@@ -130,11 +132,12 @@ export class FarmingMacro extends ModuleBase {
     }
 
     handleFarming(player) {
+        if (loadoutHandler.switching) return Client.unpressKeys();
         if (this.sprayonatorAction) return;
         if (farmingSettings.killNearbyPests && !rewarpSettings.pestKiller && this.handlePest(player)) return;
 
         const looping = rewarpSettings.looping;
-        if (rewarpSettings.pestKiller && Date.now() >= this.nextTabCheckAt && TabListUtils.readPests().alivePestCount >= rewarpSettings.pestThreshold) {
+        if (rewarpSettings.pestKiller && Date.now() >= this.nextTabCheckAt && Utils.getGardenPestStatus().gardenPests >= rewarpSettings.pestThreshold) {
             const pestColumnClear = this.isPestColumnClear(player);
             if (looping || pestColumnClear) {
                 const returnPoint = { x: player.getX(), y: player.getY(), z: player.getZ() };
@@ -148,11 +151,8 @@ export class FarmingMacro extends ModuleBase {
             return this.beginRewarp({ x: player.getX(), y: player.getY(), z: player.getZ() });
         }
 
-        if (Date.now() >= this.nextTabCheckAt) {
-            loadoutHandler.select(
-                TabListUtils.getPestCooldown() <= loadoutHandler.pestSpawnSwapCooldown ? loadoutHandler.pestSpawningSlot : loadoutHandler.farmingSlot
-            );
-        }
+        const slot = TabListUtils.getPestCooldown() <= loadoutHandler.pestSpawnSwapCooldown ? loadoutHandler.pestSpawningSlot : loadoutHandler.farmingSlot;
+        if (!loadoutHandler.select(slot)) return Client.unpressKeys();
 
         if (this.trySprayonator()) return;
 
@@ -221,8 +221,12 @@ export class FarmingMacro extends ModuleBase {
     }
 
     finishRewarp(player) {
+        if (!loadoutHandler.select(loadoutHandler.farmingSlot)) return;
+        if (Player.getHeldItemIndex() !== this.farmingSlot) {
+            Guis.setItemSlot(this.farmingSlot);
+            return;
+        }
         this.mode = FARMING;
-        loadoutHandler.select(loadoutHandler.farmingSlot);
         this.startFarming(player);
     }
 

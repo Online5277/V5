@@ -20,6 +20,7 @@ class LoadoutHandler extends ModuleBase {
         this.pestSpawnSwapCooldown = 0;
         this.currentSlot = null;
         this.targetSlot = null;
+        this.switching = false;
 
         this.addSlider('Farming Loadout Slot', 1, 12, this.farmingSlot, (value) => (this.farmingSlot = Math.round(value)));
         this.addSlider('Pest Spawning Loadout Slot', 1, 12, this.pestSpawningSlot, (value) => (this.pestSpawningSlot = Math.round(value)));
@@ -38,10 +39,7 @@ class LoadoutHandler extends ModuleBase {
     }
 
     select(slot) {
-        if (this.currentSlot === null) {
-            this.currentSlot = slot;
-            return true;
-        }
+        if (this.switching) return false;
         if (slot === this.currentSlot && this.targetSlot === null) return true;
         if (this.targetSlot !== slot) {
             this.targetSlot = slot;
@@ -55,8 +53,10 @@ class LoadoutHandler extends ModuleBase {
         if (!Guis.clickSlot(LOADOUT_SLOTS[this.targetSlot - 1])) return;
         this.currentSlot = this.targetSlot;
         this.targetSlot = null;
-        ScheduleTask(2, () => {
+        this.switching = true;
+        ScheduleTask(5, () => {
             if (Guis.guiName()?.includes('(1/3) Loadouts')) Guis.closeInv();
+            ScheduleTask(4, () => (this.switching = false));
         });
     }
 }
