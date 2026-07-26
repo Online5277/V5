@@ -145,7 +145,9 @@ export class FarmingMacro extends ModuleBase {
                 return this.beginRewarp(returnPoint, true);
             }
         }
-        if (!looping && this.isAtPoint(player, this.points.end)) return this.beginRewarp();
+        if (!looping && this.isAtPoint(player, this.points.end)) {
+            return this.beginRewarp(this.points.start, rewarpSettings.pestKiller && Utils.getGardenPestStatus().gardenPests >= rewarpSettings.pestThreshold);
+        }
         if (looping && this.shouldRunBarnTasks()) {
             ChatLib.command('sethome');
             return this.beginRewarp({ x: player.getX(), y: player.getY(), z: player.getZ() });
