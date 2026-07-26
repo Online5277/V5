@@ -18,11 +18,10 @@ const REWARP_RETRY_MS = 10_000;
 const MAX_REWARP_ATTEMPTS = 3;
 
 class RewarpHandler {
-    start(macro, rewarpStartPoint, runPestKiller = false, skipPestInitialLocation = false) {
+    start(macro, rewarpStartPoint, runPestKiller = false) {
         this.macro = macro;
         this.rewarpStartPoint = rewarpStartPoint;
         this.runPestKiller = runPestKiller;
-        this.skipPestInitialLocation = skipPestInitialLocation;
         this.rewarpAttempts = 0;
         this.returnStarted = false;
         this.returnResult = null;
@@ -65,7 +64,7 @@ class RewarpHandler {
                     this.task = null;
                     return;
                 }
-                if (this.task.start(this.macro, this.task === pestKiller && this.skipPestInitialLocation) !== false) {
+                if (this.task.start() !== false) {
                     this.phase = PHASES.RUNNING;
                     break;
                 }

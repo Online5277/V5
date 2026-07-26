@@ -505,7 +505,7 @@ class UtilsClass {
                 const text = ChatLib.removeFormatting(String(line.getName?.() ?? line)).trim();
                 const isGarden = text.includes('The Garden');
                 const gardenMatch = isGarden && text.match(/\bx\s*(\d+)\s*$/);
-                const plotMatch = text.match(/\bPlot\s*-\s*(\d+)(?:\s+.*?\bx\s*(\d+))?\s*$/);
+                const plotMatch = text.match(/\bPlot\s*-\s*(\d+)\b(?:.*?\bx\s*(\d+))?/);
                 if (isGarden) gardenPests = Number(gardenMatch?.[1] || 0);
                 if (plotMatch) {
                     currentPlot = Number(plotMatch[1]);

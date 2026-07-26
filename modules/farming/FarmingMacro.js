@@ -137,12 +137,12 @@ export class FarmingMacro extends ModuleBase {
         if (farmingSettings.killNearbyPests && !rewarpSettings.pestKiller && this.handlePest(player)) return;
 
         const looping = rewarpSettings.looping;
-        if (rewarpSettings.pestKiller && Date.now() >= this.nextTabCheckAt && Utils.getGardenPestStatus().gardenPests >= rewarpSettings.pestThreshold) {
+        if (rewarpSettings.pestKiller && Utils.getGardenPestStatus().gardenPests >= rewarpSettings.pestThreshold) {
             const pestColumnClear = this.isPestColumnClear(player);
             if (looping || pestColumnClear) {
                 const returnPoint = { x: player.getX(), y: player.getY(), z: player.getZ() };
                 if (looping) ChatLib.command('sethome');
-                return this.beginRewarp(returnPoint, true, looping && !pestColumnClear);
+                return this.beginRewarp(returnPoint, true);
             }
         }
         if (!looping && this.isAtPoint(player, this.points.end)) return this.beginRewarp();
@@ -201,10 +201,10 @@ export class FarmingMacro extends ModuleBase {
         return TabListUtils.getNames().some((line) => /\bSpray:\s*None\b/.test(TabListUtils.stripFormatting(line?.getName?.() ?? line)));
     }
 
-    beginRewarp(rewarpStartPoint = this.points.start, runPestKiller = false, skipPestInitialLocation = false) {
+    beginRewarp(rewarpStartPoint = this.points.start, runPestKiller = false) {
         Client.unpressKeys();
         this.mode = REWARPING;
-        rewarpHandler.start(this, rewarpStartPoint, runPestKiller, skipPestInitialLocation);
+        rewarpHandler.start(this, rewarpStartPoint, runPestKiller);
     }
 
     isPestColumnClear(player) {

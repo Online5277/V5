@@ -5,16 +5,11 @@ import { TabListUtils } from '../../../utils/TabListUtils';
 import { getLoadedPests } from '../../visuals/PestESP';
 import { farmingSettings } from '../FarmingSettings';
 import { Utils } from '../../../utils/Utils';
-import { ScheduleTask } from '../../../utils/ScheduleTask';
 
 const ANGRY_VILLAGER = net.minecraft.core.particles.ParticleTypes.ANGRY_VILLAGER;
 const PEST_RANGE_SQ = 10 ** 2;
 const PARTICLE_SEARCH_MS = 2_000;
-const PLOT_PATH_DELAY_MS = 2_000;
-const PLOT_WARP_MS = 3_000;
 const PLOT_TIMEOUT_MS = 30_000;
-const PLOT_FORWARD_DELAY_TICKS = 10;
-const PLOT_CLEAR_DELAY_TICKS = 5;
 const STATES = {
     SEARCHING: 'Searching',
     PATHING_PESTS: 'Pathing to pests',
@@ -31,16 +26,13 @@ class PestKiller {
         register('chat', (event) => this.onChat(event));
     }
 
-    start(macro, skipInitialLocation = false) {
-        this.macro = macro;
+    start() {
         this.running = true;
         this.state = STATES.SEARCHING;
-        this.goDirectlyToPlots = skipInitialLocation;
         this.currentPlot = null;
         this.teleportedToPlot = false;
         this.visitedPlots = new Set();
         this.pathToken = 0;
-        this.pathRetryAt = 0;
         this.targetId = null;
         this.trackedTargetId = null;
         farmingSettings.originalSlot = Player.getHeldItemIndex();
@@ -49,91 +41,76 @@ class PestKiller {
     tick() {
         if (!this.running) return true;
         const { gardenPests, currentPlot, currentPlotPests } = Utils.getGardenPestStatus();
-        if (gardenPests === null || gardenPests === 0) {
+        if (gardenPests === 0 || !gardenPests) {
             this.stop();
             return true;
         }
-        const infestedPlots = TabListUtils.readPests().infestedPlots;
-        const pestsRemainInCurrentPlot = this.teleportedToPlot && this.currentPlot !== null && currentPlot === this.currentPlot ? currentPlotPests : null;
+
+        const pestsRemainInCurrentPlot = currentPlot === this.currentPlot ? currentPlotPests : null;
         if (pestsRemainInCurrentPlot === 0) {
-            this.stopPath();
-            this.stopKilling();
-            this.finishArea();
-            this.goDirectlyToPlots = true;
-            this.scoreboardReadyAt = Date.now() + PLOT_CLEAR_DELAY_TICKS * 50;
+            this.completeCurrentPlot();
+            return false;
         }
-        if (this.currentPlot !== null && pestsRemainInCurrentPlot === null && Date.now() >= this.plotTimeoutAt) {
-            const plot = this.currentPlot;
-            this.stopPath();
-            this.stopKilling();
-            this.finishArea();
-            this.goDirectlyToPlots = true;
-            this.macro.message(`&eSkipping pest plot ${plot} after 30 seconds.`);
+        if (this.state === STATES.WAITING_FOR_PLOT) {
+            if (!this.teleportedToPlot) return false;
+            this.state = STATES.PATHING_FORWARD;
+            return false;
         }
-        if (this.state === STATES.WAITING_FOR_PLOT && Date.now() < this.pathfindAfter) return false;
-        const pests = this.goDirectlyToPlots ? [] : getLoadedPests();
-        this.goDirectlyToPlots = false;
+        if (!this.currentPlot) {
+            this.findNewPlot();
+            return false;
+        }
+        if (Date.now() >= this.plotTimeoutAt) {
+            this.completeCurrentPlot();
+            return false;
+        }
+
+        const pests = getLoadedPests();
         if (this.state === STATES.KILLING) {
             const target = pests.find((pest) => this.id(pest) === this.targetId);
             if (target && this.distanceSq(target) <= PEST_RANGE_SQ) return this.kill(target);
             this.stopKilling();
-            if (!pests.length) {
-                if (gardenPests === 0) {
-                    this.stop();
-                    return true;
-                }
-                if (pestsRemainInCurrentPlot > 0) return this.startParticleSearch();
-                if (pestsRemainInCurrentPlot === null) this.finishArea();
-            }
+        }
+
+        if (!pests.length) {
+            if (currentPlotPests > 0) return this.startParticleSearch();
         }
 
         if (pests.length) {
-            const closest = pests.reduce((closest, pest) => (this.distanceSq(pest) < this.distanceSq(closest) ? pest : closest));
-            if (this.distanceSq(closest) <= PEST_RANGE_SQ) return this.kill(closest);
-            if (Date.now() >= this.pathRetryAt && (this.state !== STATES.PATHING_PESTS || this.hasPestMoved(pests))) this.pathToPests([closest]);
+            this.particleSearchGrace = Date.now() + 1000;
+            for (const pest of pests) {
+                if (this.distanceSq(pest) <= PEST_RANGE_SQ) return this.kill(pest);
+            }
+            if (this.state !== STATES.PATHING_PESTS || this.hasPestMoved(pests)) this.pathToPests(pests);
             return false;
         }
 
-        if (this.state === STATES.PATHING_FORWARD) {
-            if (!Pathfinder.isPathing() && Date.now() >= this.pathRetryAt) this.pathToForward();
-            return false;
-        }
-        if (this.state === STATES.PATHING_PESTS) {
-            this.stopPath();
-            if (pestsRemainInCurrentPlot === null) this.finishArea();
-            else return this.startParticleSearch();
-        }
-        if (this.state === STATES.PATHING_PARTICLES) return false;
-        if (this.state === STATES.CAPTURING_PARTICLES) {
-            if (Date.now() >= this.particleSearchEndsAt) this.finishParticleCapture();
-            return false;
-        }
-        if (this.state === STATES.WAITING_FOR_PLOT) {
-            if (Date.now() >= this.nextActionAt) this.startParticleSearch();
-            return false;
-        }
-        if (Date.now() < this.scoreboardReadyAt) return false;
-        if (this.currentPlot !== null) {
-            this.startParticleSearch();
-            return false;
+        switch (this.state) {
+            case STATES.PATHING_FORWARD:
+                if (!Pathfinder.isPathing()) this.pathToForward();
+                return false;
+            case STATES.PATHING_PESTS:
+                this.stopPath();
+                return this.startParticleSearch();
+            case STATES.PATHING_PARTICLES:
+                return false;
+            case STATES.CAPTURING_PARTICLES:
+                if (Date.now() >= this.particleSearchEndsAt) this.finishParticleCapture();
+                return false;
         }
 
-        const plot = infestedPlots.find((candidate) => !this.visitedPlots.has(candidate));
-        if (plot === undefined) {
-            if (gardenPests > 0) return false;
-            this.stop();
-            return true;
-        }
+        return false;
+    }
 
+    findNewPlot() {
+        const plot = TabListUtils.readPests().infestedPlots.find((candidate) => !this.visitedPlots.has(candidate));
+        if (!plot) return;
         this.currentPlot = plot;
         this.teleportedToPlot = false;
         this.visitedPlots.add(plot);
         ChatLib.command(`tptoplot ${plot}`);
         this.plotTimeoutAt = Date.now() + PLOT_TIMEOUT_MS;
         this.state = STATES.WAITING_FOR_PLOT;
-        this.pathfindAfter = Date.now() + PLOT_PATH_DELAY_MS;
-        this.nextActionAt = Date.now() + PLOT_WARP_MS;
-        return false;
     }
 
     pathToPests(pests) {
@@ -147,7 +124,6 @@ class PestKiller {
         });
         this.startPath(goals, (success) => {
             this.state = STATES.SEARCHING;
-            if (!success) this.pathRetryAt = Date.now();
         });
     }
 
@@ -157,13 +133,6 @@ class PestKiller {
         if (!message.includes('Teleported you to Plot')) return;
 
         this.teleportedToPlot = true;
-        this.plotTimeoutAt = Number.POSITIVE_INFINITY;
-        this.pathfindAfter = Date.now() + PLOT_FORWARD_DELAY_TICKS * 50;
-        this.nextActionAt = Number.POSITIVE_INFINITY;
-        const plot = this.currentPlot;
-        ScheduleTask(PLOT_FORWARD_DELAY_TICKS, () => {
-            if (this.running && this.currentPlot === plot) this.pathToForward();
-        });
     }
 
     pathToForward() {
@@ -172,24 +141,18 @@ class PestKiller {
         const z = Player.getZ() + Math.cos(yaw) * 64;
         this.state = STATES.PATHING_FORWARD;
         this.startPath([[Math.floor(x), 80, Math.floor(z)]], (success) => {
-            if (!success) {
-                this.pathRetryAt = Date.now();
-                return;
-            }
             this.state = STATES.SEARCHING;
-            if (getLoadedPests().length) return;
-            this.startParticleSearch();
         });
     }
 
     hasPestMoved(pests) {
         return pests.some((pest) => {
             const start = this.pathPestPositions?.get(this.id(pest));
-            if (!start) return false;
+            if (!start) return true;
             const dx = pest.getX() - start.x;
             const dy = pest.getY() - start.y;
             const dz = pest.getZ() - start.z;
-            return dx * dx + dy * dy + dz * dz > 3 ** 2;
+            return dx * dx + dy * dy + dz * dz > 4 ** 2;
         });
     }
 
@@ -218,17 +181,26 @@ class PestKiller {
 
     finishArea() {
         this.currentPlot = null;
+        this.teleportedToPlot = false;
         this.state = STATES.SEARCHING;
     }
 
+    completeCurrentPlot() {
+        this.stopPath();
+        this.stopKilling();
+        this.finishArea();
+    }
+
     startParticleSearch() {
+        if (this.particleSearchGrace >= Date.now()) return false;
         if (!farmingSettings.selectVacuum()) return false;
         this.firstParticle = null;
         this.lastParticle = null;
         this.state = STATES.CAPTURING_PARTICLES;
+        this.particleSearchGrace = Date.now() + 3000;
         this.particleSearchEndsAt = Date.now() + PARTICLE_SEARCH_MS;
         Client.leftClick();
-        return true;
+        return false;
     }
 
     onParticle(packet) {
@@ -242,25 +214,21 @@ class PestKiller {
     }
 
     finishParticleCapture() {
-        if (!this.lastParticle) return this.failParticleSearch();
+        if (!this.lastParticle) return this.completeCurrentPlot();
 
         const dx = this.lastParticle.x - this.firstParticle.x;
         const dy = this.lastParticle.y - this.firstParticle.y;
         const dz = this.lastParticle.z - this.firstParticle.z;
         const length = Math.hypot(dx, dy, dz);
-        if (!length) return this.failParticleSearch();
+        if (!length) return this.completeCurrentPlot();
 
         const x = this.lastParticle.x + (dx / length) * 15;
         const z = this.lastParticle.z + (dz / length) * 15;
         this.state = STATES.PATHING_PARTICLES;
         this.startPath(this.verticalGoals(x, z), (success) => {
             this.state = STATES.SEARCHING;
-            if (!success) this.failParticleSearch();
+            if (!success) this.completeCurrentPlot();
         });
-    }
-
-    failParticleSearch() {
-        this.state = STATES.SEARCHING;
     }
 
     startPath(goals, onComplete) {
