@@ -482,13 +482,12 @@ export const drawLeftPanelIcons = (mouseX, mouseY) => {
     }
 };
 
-const drawItemBox = (item, itemX, itemY, itemWidth, mouseX, mouseY, cachedItemLayouts, isLayoutCacheValid, centerText = false) => {
+const drawItemBox = (item, itemX, itemY, itemWidth, itemHeight, mouseX, mouseY, cachedItemLayouts, isLayoutCacheValid, centerText = false) => {
     const isDirectComponent = item && item.type === 'direct-component';
     const isModuleComponent = item && item.type === 'module-component';
     const isThemeComponent = item && item.type === 'theme-component';
     const isStacked = isDirectComponent || isModuleComponent || isThemeComponent;
     const moduleBorderColor = getModuleBorderColor(item.moduleType);
-    const itemHeight = 48;
     const itemRect = {
         x: itemX,
         y: itemY,
@@ -544,6 +543,8 @@ const drawItemBox = (item, itemX, itemY, itemWidth, mouseX, mouseY, cachedItemLa
 export const drawCategoryItems = (cat, panel, panelX, yOffset, mouseX, mouseY, items, layouts, valid, query = '') => {
     const columns = panel.width < 300 ? 1 : 3;
     const iw = (panel.width - PADDING * 2 - ITEM_SPACING * (columns - 1)) / columns;
+    const itemHeight = cat.name === 'Modules' ? 40 : 48;
+    const rowHeight = itemHeight + ITEM_SPACING;
     let rowIdx = 0;
 
     if (query.length > 0 && items.length === 0) {
@@ -579,16 +580,16 @@ export const drawCategoryItems = (cat, panel, panelX, yOffset, mouseX, mouseY, i
             let subIdx = 0;
 
             g.items.forEach((item) => {
-                if (subIdx % columns === 0 && subIdx > 0) yOffset += 54;
-                drawItemBox(item, panelX + PADDING + (subIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, true);
+                if (subIdx % columns === 0 && subIdx > 0) yOffset += rowHeight;
+                drawItemBox(item, panelX + PADDING + (subIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, itemHeight, mouseX, mouseY, layouts, valid, true);
                 subIdx++;
             });
             if (g.items.length > 0) {
-                yOffset += 48;
+                yOffset += itemHeight;
             }
         } else {
-            if (rowIdx % columns === 0 && rowIdx > 0) yOffset += 54;
-            drawItemBox(g, panelX + PADDING + (rowIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, false);
+            if (rowIdx % columns === 0 && rowIdx > 0) yOffset += rowHeight;
+            drawItemBox(g, panelX + PADDING + (rowIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, itemHeight, mouseX, mouseY, layouts, valid, false);
             rowIdx++;
         }
     });

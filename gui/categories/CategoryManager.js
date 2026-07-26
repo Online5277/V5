@@ -339,15 +339,16 @@ export const createCategoriesManager = (deps) => {
                 const rawQuery = SearchBar.query.trim();
                 const query = rawQuery.toLowerCase();
                 if (category.subcategories.length > 0 && (query.length === 0 || category.name === 'Modules')) {
-                    height += category.name === 'Modules' ? PADDING : 28 + PADDING;
+                    height += getCategoryContentY(category, deps.rectangles.RightPanel) - deps.rectangles.RightPanel.y;
                 }
                 const itemsToDisplay = getFilteredItems(category, query);
-                const gridColumns = 3;
+                const gridColumns = deps.rectangles.RightPanel.width < 300 ? 1 : 3;
+                const gridRowHeight = category.name === 'Modules' ? 46 : 54;
                 let nonGroupedItemCount = 0;
                 let hasAnyResults = itemsToDisplay.length > 0;
                 const processNonGrouped = () => {
                     if (nonGroupedItemCount > 0) {
-                        height += Math.ceil(nonGroupedItemCount / gridColumns) * 54;
+                        height += Math.ceil(nonGroupedItemCount / gridColumns) * gridRowHeight;
                         nonGroupedItemCount = 0;
                     }
                 };
@@ -357,7 +358,7 @@ export const createCategoriesManager = (deps) => {
                         if (index > 0) height += 12;
                         height += 22;
                         if (group.items.length > 0) {
-                            height += Math.ceil(group.items.length / gridColumns) * 54;
+                            height += Math.ceil(group.items.length / gridColumns) * gridRowHeight;
                         }
                     } else {
                         nonGroupedItemCount++;
@@ -373,21 +374,21 @@ export const createCategoriesManager = (deps) => {
                     if (moduleMatches.length > 0) {
                         if (itemsToDisplay.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(moduleMatches[0].items.length / gridColumns) * 54;
+                        height += Math.ceil(moduleMatches[0].items.length / gridColumns) * gridRowHeight;
                         hasAnyResults = true;
                     }
 
                     if (settingsMatches.length > 0) {
                         if (itemsToDisplay.length > 0 || moduleMatches.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(settingsMatches[0].items.length / gridColumns) * 54;
+                        height += Math.ceil(settingsMatches[0].items.length / gridColumns) * gridRowHeight;
                         hasAnyResults = true;
                     }
 
                     if (themeMatches.length > 0) {
                         if (itemsToDisplay.length > 0 || moduleMatches.length > 0 || settingsMatches.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(themeMatches[0].items.length / gridColumns) * 54;
+                        height += Math.ceil(themeMatches[0].items.length / gridColumns) * gridRowHeight;
                         hasAnyResults = true;
                     }
                 }
