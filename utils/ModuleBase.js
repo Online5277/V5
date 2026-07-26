@@ -247,6 +247,7 @@ export class ModuleBase {
     bindToggleKey(title = `Toggle ${this.name}`) {
         const existingKeybinds = Utils.getConfigFile('keybinds.json') || {};
         const savedKeycode = existingKeybinds[title] || Keyboard.KEY_NONE;
+        this._wrappedKeyTitle = title;
         this._wrappedKey = new KeyBind(title, savedKeycode, `v5_${this.subcategory.toLowerCase()}`);
 
         this._wrappedKey.registerKeyPress(() => {

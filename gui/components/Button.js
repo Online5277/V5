@@ -26,7 +26,7 @@ export class Button {
         this.showContainer = options.showContainer !== false;
 
         this.optionPanelWidth = 0;
-        this.containerHeight = 48;
+        this.containerHeight = 24;
         this.description = null;
         this.highlight = createHighlight();
         this.buttonRect = {};
@@ -70,9 +70,9 @@ export class Button {
 
     draw(mouseX, mouseY) {
         const componentHeight = this.containerHeight;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
         const buttonPadding = 10;
-        const buttonHeight = 22;
+        const buttonHeight = 18;
         const buttonTextWidth = getTextWidth(this.buttonText, FontSizes.REGULAR);
         const buttonWidth = Math.max(64, buttonTextWidth + buttonPadding * 2);
 

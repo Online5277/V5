@@ -1,4 +1,4 @@
-import { isInside, PADDING, playClickSound, resetScissor, scissor } from '../Utils';
+import { BORDER_WIDTH, isInside, PADDING, playClickSound, resetScissor, scissor } from '../Utils';
 import { Button } from '../components/Button';
 import { ColorPicker } from '../components/ColorPicker';
 import { MultiToggle } from '../components/Dropdown';
@@ -9,9 +9,9 @@ import { Separator } from '../components/Separator';
 import { getComponentLayoutHeight, isComponentVisible, layoutDirectComponents } from '../components/layout';
 import { GuiRectangles, GuiState } from '../core/GuiState';
 import { handleCategoryClick, handleCategoryScroll, updateCategoryTransitions } from './CategoryEvents';
-import { drawCategoryItems, drawDirectComponents, drawOptionsPanel, drawSubcategoryButtons, getCategoryRect, getDiscordPfpRect } from './CategoryRenderer';
+import { drawCategoryItems, drawDirectComponents, drawOptionsPanel, getCategoryContentY, getCategoryRect, getDiscordPfpRect } from './CategoryRenderer';
 import { SearchBar } from './CategorySearchBar';
-import { Categories } from './CategorySystem';
+import { Categories, getVisibleDirectComponents } from './CategorySystem';
 import { MacroState } from '../../utils/MacroState';
 import { drawDashboard, getDashboardContentHeight, getDashboardModuleAt } from '../Dashboard';
 
@@ -56,10 +56,6 @@ export const createCategoriesManager = (deps) => {
 
     const SCROLL_SMOOTHING_FACTOR = 0.25;
     const AUTO_SCROLL_SMOOTHING_FACTOR = 0.06;
-    const ICON_SIZE = 28;
-    const HIGHLIGHT_PADDING = 2;
-    const HIGHLIGHT_SIZE = ICON_SIZE + HIGHLIGHT_PADDING * 2;
-
     const getCategorySelectionRect = (name) => {
         if (name === 'Discord') {
             const pfpRect = getDiscordPfpRect();
@@ -69,10 +65,10 @@ export const createCategoriesManager = (deps) => {
         if (visibleIndex === -1) return null;
         const rect = getCategoryRect(visibleIndex);
         return {
-            x: rect.x + (rect.width - ICON_SIZE) / 2 - HIGHLIGHT_PADDING,
-            y: rect.y + (rect.height - ICON_SIZE) / 2 - HIGHLIGHT_PADDING,
-            width: HIGHLIGHT_SIZE,
-            height: HIGHLIGHT_SIZE,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
             radius: 8,
         };
     };
@@ -101,9 +97,6 @@ export const createCategoriesManager = (deps) => {
 
     const beginCategorySwap = (targetName) => {
         Categories.optionsReturnCategory = null;
-        if (targetName !== 'Modules') {
-            SearchBar.resetSearch();
-        }
         Categories.previousSelected = Categories.selected;
         Categories.selected = targetName;
         Categories.currentPage = 'categories';
@@ -286,14 +279,18 @@ export const createCategoriesManager = (deps) => {
         const directCat = Categories.categories.find((c) => c.name === categoryName);
         if (!directCat || !directCat.directComponents) return 0;
 
-        return PADDING + layoutDirectComponents(directCat.directComponents).height + PADDING;
+        const panel = deps.rectangles.RightPanel;
+        return getCategoryContentY(directCat, panel) - panel.y + layoutDirectComponents(getVisibleDirectComponents(categoryName)).height;
     };
 
     const getDirectComponentScrollY = (categoryName, component) => {
         const directCategory = Categories.categories.find((c) => c.name === categoryName);
         if (!directCategory || !directCategory.directComponents) return 0;
 
-        const row = layoutDirectComponents(directCategory.directComponents, PADDING).rows.find((item) => item.component === component);
+        const panel = deps.rectangles.RightPanel;
+        const row = layoutDirectComponents(directCategory.directComponents, getCategoryContentY(directCategory, panel) - panel.y).rows.find(
+            (item) => item.component === component
+        );
         return row ? Math.max(0, row.y - 10) : 0;
     };
 
@@ -342,14 +339,15 @@ export const createCategoriesManager = (deps) => {
                 const rawQuery = SearchBar.query.trim();
                 const query = rawQuery.toLowerCase();
                 if (category.subcategories.length > 0 && (query.length === 0 || category.name === 'Modules')) {
-                    height += 28 + PADDING;
+                    height += category.name === 'Modules' ? PADDING : 28 + PADDING;
                 }
                 const itemsToDisplay = getFilteredItems(category, query);
+                const gridColumns = 3;
                 let nonGroupedItemCount = 0;
                 let hasAnyResults = itemsToDisplay.length > 0;
                 const processNonGrouped = () => {
                     if (nonGroupedItemCount > 0) {
-                        height += Math.ceil(nonGroupedItemCount / 3) * 54;
+                        height += Math.ceil(nonGroupedItemCount / gridColumns) * 54;
                         nonGroupedItemCount = 0;
                     }
                 };
@@ -359,7 +357,7 @@ export const createCategoriesManager = (deps) => {
                         if (index > 0) height += 12;
                         height += 22;
                         if (group.items.length > 0) {
-                            height += Math.ceil(group.items.length / 3) * 54;
+                            height += Math.ceil(group.items.length / gridColumns) * 54;
                         }
                     } else {
                         nonGroupedItemCount++;
@@ -375,21 +373,21 @@ export const createCategoriesManager = (deps) => {
                     if (moduleMatches.length > 0) {
                         if (itemsToDisplay.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(moduleMatches[0].items.length / 3) * 54;
+                        height += Math.ceil(moduleMatches[0].items.length / gridColumns) * 54;
                         hasAnyResults = true;
                     }
 
                     if (settingsMatches.length > 0) {
                         if (itemsToDisplay.length > 0 || moduleMatches.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(settingsMatches[0].items.length / 3) * 54;
+                        height += Math.ceil(settingsMatches[0].items.length / gridColumns) * 54;
                         hasAnyResults = true;
                     }
 
                     if (themeMatches.length > 0) {
                         if (itemsToDisplay.length > 0 || moduleMatches.length > 0 || settingsMatches.length > 0) height += 12;
                         height += 22;
-                        height += Math.ceil(themeMatches[0].items.length / 3) * 54;
+                        height += Math.ceil(themeMatches[0].items.length / gridColumns) * 54;
                         hasAnyResults = true;
                     }
                 }
@@ -421,8 +419,7 @@ export const createCategoriesManager = (deps) => {
     };
 
     const drawPopups = (mouseX, mouseY) => {
-        const activeCat = Categories.categories.find((c) => c.name === Categories.selected);
-        const components = Categories.currentPage === 'categories' ? activeCat?.directComponents : Categories.selectedItem?.components;
+        const components = Categories.currentPage === 'categories' ? getVisibleDirectComponents(Categories.selected) : Categories.selectedItem?.components;
         if (!components) return;
 
         components.forEach((component) => {
@@ -466,17 +463,20 @@ export const createCategoriesManager = (deps) => {
             pendingModuleComponent = null;
         }
 
-        if (Categories.transitionType === 'page' && Categories.transitionDirection === -1 && SearchBar.query) SearchBar.resetSearch();
         const rawQuery = SearchBar.query.trim();
         const query = rawQuery.toLowerCase();
         if (query !== lastQuery) {
             isContentHeightCacheValid = false;
             isLayoutCacheValid = false;
+            if (query && Categories.selected !== 'Modules') beginCategorySwap('Modules');
             lastQuery = query;
         }
 
         const cacheInvalidated = updateCategoryTransitions();
-        if (cacheInvalidated) isLayoutCacheValid = false;
+        if (cacheInvalidated) {
+            isLayoutCacheValid = false;
+            isContentHeightCacheValid = false;
+        }
 
         let activeComponentAnimation = false;
 
@@ -503,7 +503,8 @@ export const createCategoriesManager = (deps) => {
 
         calculateContentHeight();
 
-        const maxScroll = Math.max(0, cachedContentHeight - deps.rectangles.RightPanel.height + PADDING);
+        const contentViewportHeight = deps.rectangles.RightPanel.height;
+        const maxScroll = Math.max(0, cachedContentHeight - contentViewportHeight + PADDING);
 
         targetRightPanelScrollY = Math.max(0, Math.min(targetRightPanelScrollY, maxScroll));
 
@@ -540,28 +541,25 @@ export const createCategoriesManager = (deps) => {
         const isMouseInsidePanel = isInside(mouseX, mouseY, panel);
         const contentMouseX = isMouseInsidePanel ? mouseX : NaN;
         const contentMouseY = isMouseInsidePanel ? mouseY : NaN;
-        scissor(panel.x, panel.y, panel.width, panel.height);
+        scissor(panel.x, panel.y - BORDER_WIDTH, panel.width, panel.height + BORDER_WIDTH);
 
         if (shouldDrawItems) {
             if (!isLayoutCacheValid) cachedItemLayouts = [];
 
             const isCategorySwap = transitionActive && Categories.transitionType === 'category-swap';
 
-            const drawSingleCategory = (catName, currentPanelX, isNewCategory) => {
+            const drawSingleCategory = (catName, currentPanelX, isNewCategory, contentPanel = panel) => {
                 const cat = Categories.categories.find((c) => c.name === catName);
                 if (!cat) return;
-                let yOffset = panel.y + PADDING - currentRightPanelScrollY;
+                const contentY = getCategoryContentY(cat, contentPanel);
+                let yOffset = contentY - currentRightPanelScrollY;
                 if (cat.name === 'Dashboard') {
-                    drawDashboard(panel, currentPanelX, panel.y + PADDING, contentMouseX, contentMouseY, currentRightPanelScrollY);
+                    drawDashboard(contentPanel, currentPanelX, contentY, contentMouseX, contentMouseY, currentRightPanelScrollY);
                     return;
                 }
                 if (cat.directComponents && cat.directComponents.length > 0) {
-                    drawDirectComponents(panel, currentPanelX, panel.y + PADDING, contentMouseX, contentMouseY, currentRightPanelScrollY, catName);
+                    drawDirectComponents(contentPanel, currentPanelX, contentY, contentMouseX, contentMouseY, currentRightPanelScrollY, catName);
                     return;
-                }
-                if (cat.subcategories.length > 0) {
-                    cat.isHoverBlocked = catName === 'Modules' ? SearchBar.isHoverBlocked(contentMouseX, contentMouseY) : false;
-                    yOffset = drawSubcategoryButtons(cat, currentPanelX, yOffset, contentMouseX, contentMouseY);
                 }
                 const itemsToDisplay = getFilteredItems(cat, query);
                 if (catName === 'Modules' && query.length > 0) {
@@ -574,7 +572,7 @@ export const createCategoriesManager = (deps) => {
                 }
                 drawCategoryItems(
                     cat,
-                    panel,
+                    contentPanel,
                     currentPanelX,
                     yOffset,
                     contentMouseX,
@@ -592,16 +590,8 @@ export const createCategoriesManager = (deps) => {
 
                 const incomingX = panel.x + (dir === 1 ? panel.width * (1 - progress) : -panel.width * (1 - progress));
                 drawSingleCategory(Categories.selected, incomingX, true);
-                if (Categories.selected === 'Modules') {
-                    SearchBar.draw(contentMouseX, contentMouseY, { ...panel, x: incomingX }, panel.y + 11 - currentRightPanelScrollY);
-                    SearchBar.updateHoverBlock({ ...panel, x: incomingX }, panel.y + 11 - currentRightPanelScrollY);
-                }
                 const outgoingX = panel.x + (dir === 1 ? -panel.width * progress : panel.width * progress);
                 drawSingleCategory(Categories.previousSelected, outgoingX, false);
-                if (Categories.previousSelected === 'Modules') {
-                    SearchBar.draw(contentMouseX, contentMouseY, { ...panel, x: outgoingX }, panel.y + 11 - currentRightPanelScrollY);
-                    SearchBar.updateHoverBlock({ ...panel, x: outgoingX }, panel.y + 11 - currentRightPanelScrollY);
-                }
             } else {
                 let panelX = panel.x;
                 if (transitionActive && Categories.transitionType === 'page') {
@@ -614,10 +604,6 @@ export const createCategoriesManager = (deps) => {
                         ? Categories.optionsReturnCategory
                         : Categories.selected;
                 drawSingleCategory(transitionCategory, panelX, true);
-                if (transitionCategory === 'Modules') {
-                    SearchBar.draw(contentMouseX, contentMouseY, { ...panel, x: panelX }, panel.y + 11 - currentRightPanelScrollY);
-                    SearchBar.updateHoverBlock({ ...panel, x: panelX }, panel.y + 11 - currentRightPanelScrollY);
-                }
                 if (!isLayoutCacheValid && !transitionActive) isLayoutCacheValid = true;
             }
         }
@@ -637,19 +623,15 @@ export const createCategoriesManager = (deps) => {
         if (finishedTextInput || finishedSlider) return;
 
         const panel = deps.rectangles.RightPanel;
-        const activeCat = Categories.categories.find((c) => c.name === Categories.selected);
-        const components = Categories.currentPage === 'categories' ? activeCat?.directComponents : Categories.selectedItem?.components;
+        const components = Categories.currentPage === 'categories' ? getVisibleDirectComponents(Categories.selected) : Categories.selectedItem?.components;
         const openPopup = components?.find((component) => component instanceof Popup && component.isOpen);
         if (openPopup && typeof openPopup.handleOverlayClick === 'function' && openPopup.handleOverlayClick(mouseX, mouseY)) {
             return;
         }
 
-        const shouldHandleSearch =
-            Categories.currentPage === 'categories' &&
-            Categories.transitionDirection === 0 &&
-            (Categories.selected === 'Modules' || SearchBar.isFocused || SearchBar.isExpanded);
-        const searchY = panel.y + 11 - currentRightPanelScrollY;
-        if (shouldHandleSearch && SearchBar.handleClick(mouseX, mouseY, panel, searchY)) {
+        const shouldHandleSearch = Categories.currentPage === 'categories' && Categories.transitionDirection === 0;
+        const searchY = GuiRectangles.LeftPanel.y + PADDING;
+        if (shouldHandleSearch && SearchBar.handleClick(mouseX, mouseY, GuiRectangles.ModuleSearch, searchY)) {
             isLayoutCacheValid = false;
             isContentHeightCacheValid = false;
             resetCategoryScroll();
@@ -670,7 +652,6 @@ export const createCategoriesManager = (deps) => {
             const moduleName = getDashboardModuleAt(mouseX, mouseY);
             const moduleItem = moduleName ? Categories.findItem('Modules', moduleName) : null;
             if (moduleItem) {
-                SearchBar.resetSearch();
                 Categories.previousSelected = Categories.selected;
                 const oldRect = getCategorySelectionRect(Categories.previousSelected);
                 const newRect = getCategorySelectionRect('Modules');
@@ -759,19 +740,16 @@ export const createCategoriesManager = (deps) => {
 
     const handleMouseDrag = (mouseX, mouseY) => {
         isLayoutCacheValid = false;
-        const activeCat = Categories.categories.find((c) => c.name === Categories.selected);
-        const components = Categories.currentPage === 'categories' ? activeCat?.directComponents : Categories.selectedItem?.components;
+        const components = Categories.currentPage === 'categories' ? getVisibleDirectComponents(Categories.selected) : Categories.selectedItem?.components;
         components?.forEach((c) => {
             if (typeof c.handleMouseDrag === 'function') {
-                c.optionPanelWidth = deps.rectangles.RightPanel.width;
                 c.handleMouseDrag(mouseX, mouseY);
             }
         });
     };
 
     const handleMouseRelease = () => {
-        const activeCat = Categories.categories.find((c) => c.name === Categories.selected);
-        const components = Categories.currentPage === 'categories' ? activeCat?.directComponents : Categories.selectedItem?.components;
+        const components = Categories.currentPage === 'categories' ? getVisibleDirectComponents(Categories.selected) : Categories.selectedItem?.components;
         components?.forEach((c) => {
             if (typeof c.handleMouseRelease === 'function') c.handleMouseRelease();
         });

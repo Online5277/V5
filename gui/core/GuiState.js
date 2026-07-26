@@ -1,16 +1,54 @@
-import { BORDER_WIDTH, CORNER_RADIUS, PADDING, THEME } from '../Utils';
+import { BORDER_WIDTH, PADDING, THEME } from '../Utils';
 
 export const ANIMATION_DURATION = 400;
+
+const MIN_GUI_WIDTH = 300;
+const MIN_GUI_HEIGHT = 150;
+const MAX_GUI_SCALE = 2;
 
 export const GuiState = {
     openStartTime: 0,
     dragging: false,
     isOpening: false,
+    macroToggleOpen: false,
+    guiScale: 1,
+    pendingGuiScale: null,
     myGui: new Gui(),
 
     animatedBackground: {},
     animatedLeftPanel: {},
     animatedRightPanel: {},
+};
+
+GuiState.getMaxGuiScale = () =>
+    Math.max(
+        0.5,
+        Math.min(MAX_GUI_SCALE, Math.floor(Math.min(Renderer.screen.getWidth() / MIN_GUI_WIDTH, Renderer.screen.getHeight() / MIN_GUI_HEIGHT) * 10) / 10)
+    );
+
+GuiState.setGuiScale = (value) => {
+    GuiState.guiScale = Math.max(0.5, Math.min(MAX_GUI_SCALE, Number(value) || 1));
+};
+
+GuiState.getEffectiveGuiScale = () => Math.min(GuiState.guiScale, GuiState.getMaxGuiScale());
+
+GuiState.applyPendingGuiScale = () => {
+    if (GuiState.pendingGuiScale === null) return;
+    GuiState.setGuiScale(GuiState.pendingGuiScale);
+    GuiState.pendingGuiScale = null;
+};
+
+GuiState.getGuiWidth = () => Renderer.screen.getWidth() / GuiState.getEffectiveGuiScale();
+GuiState.getGuiHeight = () => Renderer.screen.getHeight() / GuiState.getEffectiveGuiScale();
+
+GuiState.toGuiCoordinates = (x, y) => {
+    const guiScale = GuiState.getEffectiveGuiScale();
+    if (guiScale === 1) return { x, y };
+
+    return {
+        x: x / guiScale,
+        y: y / guiScale,
+    };
 };
 
 export const Overlays = {
@@ -24,30 +62,30 @@ GuiRectangles.Background = {
     _x: null,
     _y: null,
     get x() {
-        if (this._x === null) return (Renderer.screen.getWidth() - this.width) / 2;
+        if (this._x === null) return 0;
         return this._x;
     },
     set x(val) {
         this._x = val;
     },
     get y() {
-        if (this._y === null) return (Renderer.screen.getHeight() - this.height) / 2;
+        if (this._y === null) return 0;
         return this._y;
     },
     set y(val) {
         this._y = val;
     },
     get width() {
-        return Math.round(Renderer.screen.getWidth() * 0.7);
+        return GuiState.getGuiWidth();
     },
     get height() {
-        return Math.round(Renderer.screen.getHeight() * 0.875);
+        return GuiState.getGuiHeight();
     },
-    radius: CORNER_RADIUS,
+    radius: 0,
     get color() {
         return THEME.BG_OVERLAY;
     },
-    borderWidth: BORDER_WIDTH,
+    borderWidth: 0,
     get borderColor() {
         return THEME.ACCENT_GLOW;
     },
@@ -57,41 +95,56 @@ GuiRectangles.Background = {
 GuiRectangles.LeftPanel = {
     name: 'Left',
     get x() {
-        return GuiRectangles.Background.x + PADDING;
+        return GuiRectangles.Background.x;
     },
     get y() {
-        return GuiRectangles.Background.y + PADDING;
+        return GuiRectangles.Background.y;
     },
-    width: 50,
+    width: 44,
     get height() {
-        return GuiRectangles.Background.height - PADDING * 2;
+        return GuiRectangles.Background.height;
     },
-    radius: CORNER_RADIUS,
+    radius: 0,
     get color() {
         return THEME.BG_WINDOW;
     },
-    borderWidth: BORDER_WIDTH,
+    borderWidth: 0,
     get borderColor() {
         return THEME.BORDER_ACCENT;
     },
     isAnimated: true,
 };
 
+GuiRectangles.ModuleSearch = {
+    get x() {
+        return GuiRectangles.LeftPanel.x;
+    },
+    get y() {
+        return GuiRectangles.LeftPanel.y;
+    },
+    width: 220,
+    get height() {
+        return GuiRectangles.LeftPanel.height;
+    },
+};
+
 GuiRectangles.RightPanel = {
     name: 'Right',
     get x() {
-        return GuiRectangles.LeftPanel.x + GuiRectangles.LeftPanel.width + PADDING;
+        const leftEdge = GuiRectangles.LeftPanel.x + GuiRectangles.LeftPanel.width + PADDING / 2;
+        const rightEdge = GuiState.getGuiWidth() - PADDING / 2;
+        return leftEdge + (rightEdge - leftEdge - this.width) / 2;
     },
     get y() {
-        return GuiRectangles.Background.y + PADDING;
+        return 4;
     },
     get width() {
-        return GuiRectangles.Background.width - PADDING * 3 - GuiRectangles.LeftPanel.width;
+        return Math.min(440, GuiState.getGuiWidth() - GuiRectangles.LeftPanel.width - PADDING);
     },
     get height() {
-        return GuiRectangles.Background.height - PADDING * 2;
+        return GuiState.getGuiHeight() - this.y;
     },
-    radius: CORNER_RADIUS,
+    radius: 12,
     get color() {
         return THEME.BG_WINDOW;
     },

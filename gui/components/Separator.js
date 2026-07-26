@@ -33,7 +33,7 @@ export class Separator {
             width: bgWidth,
             height: 16,
             radius: 6,
-            color: THEME.BG_WINDOW,
+            color: this.backgroundColor || THEME.BG_WINDOW,
         });
 
         drawText(this.title, this.x + 8, this.y + 8, FontSizes.REGULAR, THEME.TEXT);

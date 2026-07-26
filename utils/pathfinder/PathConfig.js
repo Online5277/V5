@@ -86,11 +86,11 @@ class PathFindingConfig extends ModuleBase {
 
         this.addDirectSlider(
             'Pathfinder Max Compute',
-            500_000,
-            5_000_000,
-            500_000,
+            500,
+            5_000,
+            500,
             (value) => {
-                this.PATHFINDER_MAX_COMPUTE = Number(value);
+                this.PATHFINDER_MAX_COMPUTE = Number(value) * 1_000;
             },
             'Maximum native pathfinder iterations before giving up.',
             'Pathfinding'

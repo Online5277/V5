@@ -15,6 +15,7 @@ import {
 } from '../Utils';
 import { Button } from './Button';
 import { getComponentLayoutHeight } from './layout';
+import { GuiState } from '../core/GuiState';
 
 const CLOSE_TEXT = '×';
 const ANIMATION_DURATION = 350;
@@ -29,7 +30,7 @@ export class Popup {
         this.callback = callback;
 
         this.optionPanelWidth = 0;
-        this.containerHeight = 48;
+        this.containerHeight = 24;
         this.description = null;
         this.statusText = null;
 
@@ -78,7 +79,7 @@ export class Popup {
 
     getWindowHeight() {
         const contentHeight = this.getContentHeight();
-        const maxHeight = Math.max(150, Renderer.screen.getHeight() * 0.8);
+        const maxHeight = Math.max(150, GuiState.getGuiHeight() * 0.8);
         return Math.min(maxHeight, this.headerHeight + this.windowPadding * 2 + contentHeight);
     }
 
@@ -93,8 +94,8 @@ export class Popup {
     }
 
     getWindowRect() {
-        const screenW = Renderer.screen.getWidth();
-        const screenH = Renderer.screen.getHeight();
+        const screenW = GuiState.getGuiWidth();
+        const screenH = GuiState.getGuiHeight();
         const baseWidth = Math.min(540, screenW * 0.7);
         const height = this.getWindowHeight();
         return {
@@ -156,8 +157,8 @@ export class Popup {
         this.windowRect = windowRect;
 
         if (this.dimScreen) {
-            const screenW = Renderer.screen.getWidth();
-            const screenH = Renderer.screen.getHeight();
+            const screenW = GuiState.getGuiWidth();
+            const screenH = GuiState.getGuiHeight();
             const bgAlpha = Math.min(0.4, 0.4 * (this.animationState === 'closing' ? 1 - progress : progress));
             drawRoundedRectangle({
                 x: 0,

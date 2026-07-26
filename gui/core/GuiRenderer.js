@@ -1,8 +1,17 @@
 import { categoryManager } from '../categories/CategoryManager';
-import { drawLeftPanelBackgrounds, drawLeftPanelIcons } from '../categories/CategoryRenderer';
-import { clamp, drawRoundedRectangleWithBorder, easeOutBack, resetScissor, scissor } from '../Utils';
+import { Categories } from '../categories/CategorySystem';
+import { SearchBar } from '../categories/CategorySearchBar';
+import {
+    drawLeftPanelBackgrounds,
+    drawLeftPanelIcons,
+    drawModuleNavBackground,
+    drawSubcategoryButtons,
+    getModuleNavRect,
+} from '../categories/CategoryRenderer';
+import { BORDER_WIDTH, PADDING, THEME, clamp, drawRect, drawRoundedRectangleWithBorder, easeOutBack, resetScissor, scissor } from '../Utils';
 import { ANIMATION_DURATION, GuiRectangles, GuiState } from './GuiState';
 import { GuiTooltip } from './GuiTooltip';
+import { macroToggleGui } from '../MacroToggleGui';
 
 export const drawGUI = (mouseX, mouseY) => {
     const elapsed = Date.now() - GuiState.openStartTime;
@@ -20,24 +29,79 @@ export const drawGUI = (mouseX, mouseY) => {
         NVG.beginFrame(Renderer.screen.getWidth(), Renderer.screen.getHeight());
         NVG.save();
 
-        NVG.translate(centerX, centerY);
-        NVG.scale(ease, ease);
-        NVG.translate(-centerX, -centerY);
+        const guiScale = GuiState.getEffectiveGuiScale();
+        NVG.scale(guiScale, guiScale);
+
+        drawRoundedRectangleWithBorder(targetBackground);
 
         GuiTooltip.reset();
 
-        drawRoundedRectangleWithBorder(GuiRectangles.Background);
-        drawRoundedRectangleWithBorder(GuiRectangles.LeftPanel);
-        drawRoundedRectangleWithBorder(GuiRectangles.RightPanel);
+        if (GuiState.macroToggleOpen) {
+            NVG.save();
+            NVG.translate(centerX, centerY);
+            NVG.scale(ease, ease);
+            NVG.translate(-centerX, -centerY);
+            macroToggleGui.draw(mouseX, mouseY);
+            NVG.restore();
+        } else {
+            drawRoundedRectangleWithBorder(GuiRectangles.LeftPanel);
+            drawRect({
+                x: GuiRectangles.LeftPanel.x + GuiRectangles.LeftPanel.width - BORDER_WIDTH,
+                y: GuiRectangles.LeftPanel.y,
+                width: BORDER_WIDTH,
+                height: GuiRectangles.LeftPanel.height,
+                color: THEME.BORDER,
+            });
+            drawLeftPanelBackgrounds(mouseX, mouseY);
+            drawLeftPanelIcons(mouseX, mouseY);
 
-        drawLeftPanelBackgrounds(mouseX, mouseY);
-        drawLeftPanelIcons(mouseX, mouseY);
+            SearchBar.draw(mouseX, mouseY, GuiRectangles.ModuleSearch, GuiRectangles.LeftPanel.y + PADDING, true);
 
-        const panel = GuiRectangles.RightPanel;
-        scissor(panel.x, panel.y, panel.width, panel.height);
-        categoryManager?.draw(mouseX, mouseY);
-        resetScissor();
-        categoryManager?.drawPopups?.(mouseX, mouseY);
+            NVG.save();
+            NVG.translate(centerX, centerY);
+            NVG.scale(ease, ease);
+            NVG.translate(-centerX, -centerY);
+
+            const panel = GuiRectangles.RightPanel;
+            const drawCategoryNav = (category, xOffset, drawBackground = true) => {
+                if (category?.subcategories.length > 0) drawSubcategoryButtons(category, mouseX, mouseY, xOffset, drawBackground);
+            };
+            const previousCategory = Categories.categories.find((category) => category.name === Categories.previousSelected);
+            const selectedCategory = Categories.categories.find((category) => category.name === Categories.selected);
+            const navRect = getModuleNavRect();
+
+            scissor(navRect.x - 1, navRect.y - 1, navRect.width + 2, navRect.height + 2);
+            if (Categories.transitionDirection !== 0 && Categories.transitionType === 'category-swap') {
+                const bothHaveSubcategories = selectedCategory?.subcategories.length > 0 && previousCategory?.subcategories.length > 0;
+                if (bothHaveSubcategories) drawModuleNavBackground();
+                const distance = panel.width * (1 - Categories.transitionProgress);
+                drawCategoryNav(selectedCategory, Categories.transitionDirection === 1 ? distance : -distance, !bothHaveSubcategories);
+                drawCategoryNav(
+                    previousCategory,
+                    Categories.transitionDirection === 1 ? -panel.width * Categories.transitionProgress : panel.width * Categories.transitionProgress,
+                    !bothHaveSubcategories
+                );
+            } else if (Categories.transitionDirection !== 0 && Categories.transitionType === 'page') {
+                const xOffset =
+                    Categories.transitionDirection === 1 ? -panel.width * Categories.transitionProgress : -panel.width * (1 - Categories.transitionProgress);
+                drawCategoryNav(selectedCategory, xOffset);
+            } else if (Categories.currentPage === 'categories') {
+                drawCategoryNav(selectedCategory, 0);
+            }
+            resetScissor();
+
+            const contentY =
+                Categories.currentPage === 'categories' && Categories.transitionDirection === 0 && selectedCategory?.subcategories.length > 0
+                    ? navRect.y + navRect.height + 16
+                    : panel.y;
+            const contentClipY = contentY - BORDER_WIDTH;
+            scissor(panel.x, contentClipY, panel.width, panel.height - (contentClipY - panel.y));
+            categoryManager?.draw(mouseX, mouseY);
+            resetScissor();
+            categoryManager?.drawPopups?.(mouseX, mouseY);
+
+            NVG.restore();
+        }
 
         GuiTooltip.update();
         GuiTooltip.draw(mouseX, mouseY);

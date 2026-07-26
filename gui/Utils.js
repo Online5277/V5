@@ -22,19 +22,19 @@ export const colorWithAlpha = (baseColor, alpha) => {
     return ((finalAlpha & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
 };
 
-export const PADDING = 12;
+export const PADDING = 8;
 export const BORDER_WIDTH = 1;
 export const CORNER_RADIUS = 12;
 
-export const CATEGORY_HEIGHT = 36;
-export const CATEGORY_PADDING = 8;
+export const CATEGORY_HEIGHT = 30;
+export const CATEGORY_PADDING = 4;
 export const LEFT_PANEL_TEXT_HEIGHT = 8;
 
 export const CATEGORY_BOX_PADDING = 8;
-export const ITEM_SPACING = 10;
+export const ITEM_SPACING = 6;
 export const SEPARATOR_HEIGHT = 24;
-export const SUBCATEGORY_BUTTON_HEIGHT = 28;
-export const SUBCATEGORY_BUTTON_SPACING = 8;
+export const SUBCATEGORY_BUTTON_HEIGHT = 24;
+export const SUBCATEGORY_BUTTON_SPACING = 4;
 
 export const TypingState = {
     isTyping: false,
@@ -51,31 +51,31 @@ export const getTypedCharacter = (char) => {
 };
 
 export const THEME = {
-    BG_WINDOW: new Color(0.09, 0.1, 0.13, 1),
-    BG_OVERLAY: new Color(0.06, 0.07, 0.09, 0.85),
-    BG_COMPONENT: new Color(0.11, 0.12, 0.15, 1),
-    BG_ELEVATED: new Color(0.13, 0.14, 0.17, 1),
-    BG_INSET: new Color(0.15, 0.16, 0.19, 1),
+    BG_WINDOW: new Color(0.07, 0.06, 0.055, 1),
+    BG_OVERLAY: new Color(0.045, 0.04, 0.04, 0.84),
+    BG_COMPONENT: new Color(0.09, 0.075, 0.07, 1),
+    BG_ELEVATED: new Color(0.12, 0.1, 0.095, 1),
+    BG_INSET: new Color(0.24, 0.2, 0.19, 1),
 
     OV_WINDOW: new Color(0.04, 0.04, 0.04, 0.75),
     OV_BORDER: new Color(0.4, 0.7, 1.0, 0.0),
     OV_ACCENT: new Color(0.4, 0.7, 1.0, 1),
 
-    HOVER: new Color(0.17, 0.18, 0.22, 1),
-    ACCENT: new Color(0.4, 0.7, 1, 1),
-    ACCENT_GLOW: new Color(0.4, 0.7, 1, 0.2),
-    ACCENT_DIM: new Color(0.4, 0.7, 1, 0.15),
+    HOVER: new Color(0.15, 0.12, 0.115, 1),
+    ACCENT: new Color(0.9, 0.77, 0.73, 1),
+    ACCENT_GLOW: new Color(0.9, 0.77, 0.73, 0.2),
+    ACCENT_DIM: new Color(0.9, 0.77, 0.73, 0.15),
 
     TEXT: 0xffffffff,
-    TEXT_MUTED: 0xff99a3b0,
-    TEXT_LINK: 0xff66b3ff,
+    TEXT_MUTED: 0xffaaa09d,
+    TEXT_LINK: 0xffe6c4bb,
     TEXT_DIM: new Color(0.9, 0.9, 0.9, 1),
 
-    BORDER: new Color(0.2, 0.21, 0.24, 1),
-    BORDER_ACCENT: new Color(0.4, 0.7, 1, 0.15),
+    BORDER: new Color(0.3, 0.26, 0.24, 1),
+    BORDER_ACCENT: new Color(0.9, 0.77, 0.73, 0.15),
 
     KNOB: new Color(1, 1, 1, 1),
-    SWITCH_OFF: new Color(0.25, 0.26, 0.29, 1),
+    SWITCH_OFF: new Color(0.34, 0.32, 0.32, 1),
 
     TOOLTIP_BG: new Color(0.11, 0.12, 0.15, 0.98),
     TOOLTIP_TEXT: 0xfff0f0f0,

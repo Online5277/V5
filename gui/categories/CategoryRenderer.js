@@ -15,6 +15,7 @@ import {
     drawRoundedRectangleVaried,
     drawRoundedRectangleWithBorder,
     drawText,
+    clamp,
     easeInOutQuad,
     easeOutCubic,
     getTextWidth,
@@ -24,11 +25,11 @@ import {
 } from '../Utils';
 import { Popup } from '../components/Popup';
 import { Separator } from '../components/Separator';
-import { getComponentLayoutHeight, getComponentXOffset, isComponentVisible } from '../components/layout';
+import { getComponentLayoutHeight, getDirectComponentPanelWidth, getDirectComponentX, isComponentVisible, layoutDirectComponents } from '../components/layout';
 import { GuiRectangles } from '../core/GuiState';
 import { setTooltip } from '../core/GuiTooltip';
 import { SearchBar } from './CategorySearchBar';
-import { Categories } from './CategorySystem';
+import { Categories, getVisibleDirectComponents } from './CategorySystem';
 import { globalAssetsDir } from '../../utils/Constants';
 import { getDiscordPfpPath } from '../../utils/NetworkUtils';
 
@@ -39,20 +40,24 @@ const SETTINGS_ICON_PATH = ASSETS_PATH + 'settings.svg';
 const DASHBOARD_ICON_PATH = ASSETS_PATH + 'dashboard.svg';
 const EDIT_ICON_PATH = ASSETS_PATH + 'edit.svg';
 
+export const getModuleBorderColor = (moduleType) =>
+    moduleType === 'developer' ? colorWithAlpha(THEME.NOTIF_WARNING, 0.75) : moduleType === 'user' ? colorWithAlpha(THEME.NOTIF_ERROR, 0.75) : null;
+
 export const getCategoryRect = (index) => {
     const visibleCategories = Categories.getVisibleCategories();
     const safeIndex = Math.max(0, Math.min(index, visibleCategories.length - 1));
+    const menuHeight = visibleCategories.length * (CATEGORY_HEIGHT + CATEGORY_PADDING) - CATEGORY_PADDING;
     return {
-        x: GuiRectangles.LeftPanel.x + PADDING,
-        y: GuiRectangles.LeftPanel.y + PADDING + safeIndex * (CATEGORY_HEIGHT + CATEGORY_PADDING),
-        width: GuiRectangles.LeftPanel.width - PADDING * 2,
+        x: GuiRectangles.LeftPanel.x + 4,
+        y: GuiRectangles.LeftPanel.y + Math.max(14, (GuiRectangles.LeftPanel.height - menuHeight) / 2) + safeIndex * (CATEGORY_HEIGHT + CATEGORY_PADDING),
+        width: GuiRectangles.LeftPanel.width - 8,
         height: CATEGORY_HEIGHT,
     };
 };
 
 export const getDiscordPfpRect = () => {
     const leftPanel = GuiRectangles.LeftPanel;
-    const pfpSize = 28;
+    const pfpSize = 20;
     return {
         x: leftPanel.x + (leftPanel.width - pfpSize) / 2,
         y: leftPanel.y + leftPanel.height - pfpSize - PADDING,
@@ -61,13 +66,64 @@ export const getDiscordPfpRect = () => {
     };
 };
 
-export const drawSubcategoryButtons = (catObj, panelX, yOffset, mouseX, mouseY) => {
-    const cat = Categories;
+export const getModuleNavRect = (xOffset = 0) => {
+    const panel = GuiRectangles.RightPanel;
+    return { x: panel.x + PADDING + xOffset, y: 4, width: panel.width - PADDING * 2, height: 26 };
+};
 
-    const isFullWidthSearch = SearchBar.query.trim().length > 0;
-    if (isFullWidthSearch) return yOffset + SUBCATEGORY_BUTTON_HEIGHT + PADDING;
+export const drawModuleNavBackground = (xOffset = 0) => {
+    drawRoundedRectangleWithBorder({
+        ...getModuleNavRect(xOffset),
+        radius: 8,
+        color: THEME.BG_COMPONENT,
+        borderWidth: 1,
+        borderColor: THEME.BORDER,
+    });
+};
 
-    if (cat.animationRect) {
+export const getCategoryContentY = (catObj, panel) =>
+    catObj?.subcategories.length > 0 ? getModuleNavRect().y + getModuleNavRect().height + 16 : catObj?.name === 'Dashboard' ? panel.y : panel.y + PADDING;
+
+export const getModuleNavButtonRect = (catObj, index, xOffset = 0) => {
+    const navRect = getModuleNavRect(xOffset);
+    const subcategories = ['All', ...catObj.subcategories];
+    let x = navRect.x + 4;
+    for (let i = 0; i < index; i++) x += getTextWidth(subcategories[i], FontSizes.MEDIUM) + 16 + SUBCATEGORY_BUTTON_SPACING;
+    return { x, y: navRect.y + 1, width: getTextWidth(subcategories[index], FontSizes.MEDIUM) + 16, height: navRect.height - 2 };
+};
+
+const getModuleNavScrollTarget = (catObj, state = Categories) => {
+    const navRect = getModuleNavRect();
+    const subcategories = ['All', ...catObj.subcategories];
+    const selectedIndex = Math.max(0, subcategories.indexOf(state.selectedSubcategory || 'All'));
+    const selectedRect = getModuleNavButtonRect(catObj, selectedIndex);
+    const lastRect = getModuleNavButtonRect(catObj, subcategories.length - 1);
+    const maxScroll = Math.max(0, lastRect.x + lastRect.width + 4 - (navRect.x + navRect.width));
+    return clamp(selectedRect.x + selectedRect.width / 2 - (navRect.x + navRect.width / 2), 0, maxScroll);
+};
+
+export const getModuleNavScrollX = (catObj, animate = false, state = Categories) => {
+    const target = getModuleNavScrollTarget(catObj, state);
+    if (!animate) return state.subcatScrollX;
+
+    const now = Date.now();
+    if (state.subcatScrollCategory !== catObj.name) {
+        state.subcatScrollCategory = catObj.name;
+        state.subcatScrollX = target;
+        state.subcatScrollUpdatedAt = now;
+        return target;
+    }
+    const elapsed = now - state.subcatScrollUpdatedAt;
+    state.subcatScrollUpdatedAt = now;
+    state.subcatScrollX += (target - state.subcatScrollX) * Math.min(1, elapsed / 150);
+    return state.subcatScrollX;
+};
+
+export const drawSubcategoryButtons = (catObj, mouseX, mouseY, xOffset = 0, drawBackground = true, state = Categories) => {
+    const cat = state;
+    const scrollX = getModuleNavScrollX(catObj, xOffset === 0, state);
+
+    if (cat.animationRect && xOffset === 0) {
         const elapsed = Date.now() - cat.subcatTransitionStart;
         const rawProgress = Math.min(1, elapsed / cat.subcatAnimationDuration);
         cat.subcatTransitionProgress = easeInOutQuad(rawProgress);
@@ -75,31 +131,33 @@ export const drawSubcategoryButtons = (catObj, panelX, yOffset, mouseX, mouseY) 
 
         cat.animationRect.x = cat.animationRect.startX + (cat.animationRect.endX - cat.animationRect.startX) * p;
         cat.animationRect.width = cat.animationRect.startWidth + (cat.animationRect.endWidth - cat.animationRect.startWidth) * p;
-        cat.animationRect.y = yOffset;
+        cat.animationRect.y = cat.animationRect.startY + (cat.animationRect.endY - cat.animationRect.startY) * p;
+        cat.animationRect.height = cat.animationRect.startHeight + (cat.animationRect.endHeight - cat.animationRect.startHeight) * p;
         if (rawProgress >= 1) cat.animationRect = null;
     }
 
     const subcategoriesToDraw = ['All', ...catObj.subcategories];
 
-    const drawSelectedButton = (rect) => {
+    if (drawBackground) drawModuleNavBackground(xOffset);
+
+    const drawSelectedButton = (rect, color = THEME.ACCENT_DIM) => {
         drawRoundedRectangle({
             x: rect.x,
             y: rect.y + 2.5,
             width: rect.width,
             height: rect.height - 5,
             radius: 8,
-            color: THEME.ACCENT_DIM,
+            color,
         });
     };
 
     if (cat.animationRect) {
-        drawSelectedButton(cat.animationRect);
+        drawSelectedButton({ ...cat.animationRect, x: cat.animationRect.x + xOffset - scrollX });
     }
 
-    let currentX = panelX + PADDING;
     subcategoriesToDraw.forEach((subcat) => {
-        const buttonTextWidth = getTextWidth(subcat, FontSizes.MEDIUM) + 20;
-        const buttonRect = { x: currentX, y: yOffset, width: buttonTextWidth, height: SUBCATEGORY_BUTTON_HEIGHT };
+        const rawButtonRect = getModuleNavButtonRect(catObj, subcategoriesToDraw.indexOf(subcat), xOffset);
+        const buttonRect = { ...rawButtonRect, x: rawButtonRect.x - scrollX };
         const isSelected = (cat.selectedSubcategory === subcat || (!cat.selectedSubcategory && subcat === 'All')) && !cat.animationRect;
         const isHovered = isInside(mouseX, mouseY, buttonRect) && !cat.isHoverBlocked;
 
@@ -115,46 +173,36 @@ export const drawSubcategoryButtons = (catObj, panelX, yOffset, mouseX, mouseY) 
         if (isHovered) state.progress = Math.min(1, state.progress + delta);
         else state.progress = Math.max(0, state.progress - delta);
 
-        if (isSelected) cat.selectedSubcategoryButton = buttonRect;
+        if (isSelected) cat.selectedSubcategoryButton = rawButtonRect;
 
         if (!cat.animationRect) {
             if (isSelected) {
                 drawSelectedButton(buttonRect);
             } else if (state.progress > 0) {
-                drawRoundedRectangle({
-                    x: buttonRect.x,
-                    y: buttonRect.y,
-                    width: buttonRect.width,
-                    height: buttonRect.height,
-                    radius: 8,
-                    color: colorWithAlpha(THEME.BG_INSET, state.progress),
-                });
+                drawSelectedButton(buttonRect, colorWithAlpha(THEME.ACCENT_DIM, state.progress));
             }
         }
 
         const textColor = isSelected ? THEME.TEXT : THEME.TEXT_MUTED;
         drawText(
             subcat,
-            currentX + buttonTextWidth / 2 - getTextWidth(subcat, FontSizes.MEDIUM) / 2,
-            yOffset + SUBCATEGORY_BUTTON_HEIGHT / 2,
+            buttonRect.x + (buttonRect.width - getTextWidth(subcat, FontSizes.MEDIUM)) / 2,
+            buttonRect.y + buttonRect.height / 2,
             FontSizes.MEDIUM,
             textColor
         );
-        currentX += buttonTextWidth + SUBCATEGORY_BUTTON_SPACING;
     });
-
-    return yOffset + SUBCATEGORY_BUTTON_HEIGHT + PADDING;
 };
 
 export const drawDirectComponents = (panel, panelX, yOffset, mouseX, mouseY, scrollY, categoryName) => {
     const cat = Categories.categories.find((c) => c.name === categoryName);
     if (!cat || !cat.directComponents) return yOffset;
 
-    const components = cat.directComponents;
+    const components = getVisibleDirectComponents(categoryName);
     const panelWidth = panel.width;
-
     let currentY = yOffset - scrollY;
-    let currentSection = null;
+
+    const layout = layoutDirectComponents(components, yOffset - scrollY);
 
     const shouldShowSearchEmptyState = categoryName === 'Settings' || categoryName === 'Theme';
     if (shouldShowSearchEmptyState && SearchBar.query.trim().length > 0) {
@@ -182,39 +230,30 @@ export const drawDirectComponents = (panel, panelX, yOffset, mouseX, mouseY, scr
         }
     }
 
-    components.filter(isComponentVisible).forEach((component, index) => {
-        if (component.sectionName && component.sectionName !== currentSection) {
-            currentSection = component.sectionName;
+    layout.sections.forEach((section) => {
+        const separator = new Separator(section.name, true);
+        separator.x = panelX + PADDING;
+        separator.y = section.y;
+        separator.optionPanelWidth = panelWidth;
+        separator.draw(mouseX, mouseY);
+    });
 
-            if (index > 0) currentY += 16;
-
-            const separator = new Separator(currentSection);
-            separator.x = panelX + PADDING;
-            separator.y = currentY;
-            separator.optionPanelWidth = panelWidth;
-            separator.draw(mouseX, mouseY);
-
-            currentY += 26;
-        }
-
+    layout.rows.forEach(({ component, y }) => {
         const isPopup = component instanceof Popup;
         if (typeof component.draw === 'function' || isPopup) {
-            const xOffset = getComponentXOffset(component);
-            component.x = panelX + PADDING + xOffset;
-            component.y = currentY;
-            component.optionPanelWidth = panelWidth;
+            component.x = getDirectComponentX(panel, panelX);
+            component.y = y;
+            component.optionPanelWidth = getDirectComponentPanelWidth(panel);
             component.optionPanelHeight = panel.height;
             if (isPopup && typeof component.drawButton === 'function') {
                 component.drawButton(mouseX, mouseY);
             } else {
                 component.draw(mouseX, mouseY);
             }
-
-            currentY += getComponentLayoutHeight(component);
         }
     });
 
-    return currentY + scrollY;
+    return layout.rows.length > 0 ? yOffset + layout.height : currentY + scrollY;
 };
 
 export const drawOptionsPanel = (panel, mouseX, mouseY, macroToggleButton = null) => {
@@ -230,7 +269,7 @@ export const drawOptionsPanel = (panel, mouseX, mouseY, macroToggleButton = null
     const scrollY = Categories.optionsScrollY;
 
     const backButtonText = 'Back';
-    const backButtonX = optionX + 10;
+    const backButtonX = optionX;
     const backButtonY = optionY + 12;
     const drawnBackY = backButtonY - scrollY;
     const isBackHovered = isInside(mouseX, mouseY, { x: backButtonX, y: drawnBackY, width: getTextWidth(backButtonText, FontSizes.SMALL), height: 10 });
@@ -254,7 +293,7 @@ export const drawOptionsPanel = (panel, mouseX, mouseY, macroToggleButton = null
     }
 
     const dividerY = optionY + 66 - scrollY;
-    drawRoundedRectangle({ x: backButtonX, y: dividerY, width: panel.width - PADDING * 2 - 20, height: 1, radius: 1, color: THEME.BG_INSET });
+    drawRoundedRectangle({ x: backButtonX, y: dividerY, width: panel.width - PADDING * 2, height: 1, radius: 1, color: THEME.BG_INSET });
 
     let drawnCompY = optionY + 78 - scrollY;
     selectedItem.components.forEach((component) => {
@@ -262,8 +301,7 @@ export const drawOptionsPanel = (panel, mouseX, mouseY, macroToggleButton = null
         const isPopup = component instanceof Popup;
         if (!isPopup && typeof component.draw !== 'function') return;
 
-        const xOffset = getComponentXOffset(component);
-        component.x = optionX + xOffset;
+        component.x = optionX;
         component.y = drawnCompY;
         component.optionPanelWidth = panel.width;
         component.optionPanelHeight = panel.height;
@@ -280,10 +318,10 @@ export const drawLeftPanelBackgrounds = (mouseX, mouseY) => {
     const leftPanel = GuiRectangles.LeftPanel;
     const pfpRect = getDiscordPfpRect();
     const pfpY = pfpRect.y;
-    const editIconSize = 16;
+    const editIconSize = 14;
     const editIconX = leftPanel.x + (leftPanel.width - editIconSize) / 2;
-    const editIconY = pfpY - editIconSize - 15;
-    const editButtonRect = { x: editIconX - 6, y: editIconY - 6, width: editIconSize + 12, height: editIconSize + 12, radius: 8 };
+    const editIconY = pfpY - editIconSize - 8;
+    const editButtonRect = { x: editIconX - 4, y: editIconY - 4, width: editIconSize + 8, height: editIconSize + 8, radius: 4 };
     const displaySelectedCategory =
         Categories.transitionType === 'page' && Categories.transitionDirection === -1 && Categories.optionsReturnCategory
             ? Categories.optionsReturnCategory
@@ -381,12 +419,8 @@ export const drawLeftPanelBackgrounds = (mouseX, mouseY) => {
         if (state.progress > 0 && (displaySelectedCategory !== name || Categories.catAnimationRect)) {
             const rect = item.rect;
             const easedProgress = easeOutCubic(state.progress);
-            const moduleRectSize = 28;
-            const iconX = rect.x + (rect.width - moduleRectSize) / 2;
-            const iconY = rect.y + (rect.height - moduleRectSize) / 2;
-            const highlightRect = { x: iconX - 2, y: iconY - 2, width: moduleRectSize + 4, height: moduleRectSize + 4, radius: 8 };
-
-            const finalRect = name === 'Edit' || name === 'Discord' ? { ...item.rect, radius: name === 'Discord' ? 16 : item.rect.radius || 8 } : highlightRect;
+            const finalRect =
+                name === 'Edit' || name === 'Discord' ? { ...item.rect, radius: name === 'Discord' ? 16 : item.rect.radius || 8 } : { ...item.rect, radius: 8 };
 
             drawHoverHighlight(finalRect, colorWithAlpha(THEME.BG_INSET, easedProgress), name);
         }
@@ -402,12 +436,8 @@ export const drawLeftPanelBackgrounds = (mouseX, mouseY) => {
         if (selectedCat) {
             const i = Categories.getVisibleCategories().indexOf(selectedCat);
             const rect = getCategoryRect(i);
-            const moduleRectSize = 28;
-            const iconX = rect.x + (rect.width - moduleRectSize) / 2;
-            const iconY = rect.y + (rect.height - moduleRectSize) / 2;
-            const highlightRect = { x: iconX - 2, y: iconY - 2, width: moduleRectSize + 4, height: moduleRectSize + 4, radius: 8 };
-            drawRoundedRectangle({ ...highlightRect, color: THEME.ACCENT_DIM });
-            drawRoundedRectangle({ ...highlightRect, color: colorWithAlpha(THEME.ACCENT, 0.12) });
+            drawRoundedRectangle({ ...rect, radius: 8, color: THEME.ACCENT_DIM });
+            drawRoundedRectangle({ ...rect, radius: 8, color: colorWithAlpha(THEME.ACCENT, 0.12) });
         } else if (displaySelectedCategory === 'Discord') {
             drawRoundedRectangle({
                 x: pfpRect.x - 2,
@@ -426,22 +456,23 @@ export const drawLeftPanelBackgrounds = (mouseX, mouseY) => {
 export const drawLeftPanelIcons = (mouseX, mouseY) => {
     Categories.getVisibleCategories().forEach((cat, i) => {
         const rect = getCategoryRect(i);
-        const moduleSize = 17;
+        const moduleSize = 14;
         const iconX = rect.x + (rect.width - moduleSize) / 2;
-        const iconY = rect.y + (rect.height - moduleSize) / 2;
+        const iconY = rect.y + 3;
         let iconPath = SETTINGS_ICON_PATH;
         if (cat.name === 'Dashboard') iconPath = DASHBOARD_ICON_PATH;
         else if (cat.name === 'Modules') iconPath = MODULE_ICON_PATH;
         else if (cat.name === 'Theme') iconPath = THEME_ICON_PATH;
         drawImage(iconPath, iconX, iconY, moduleSize, moduleSize);
+        drawCenteredText(cat.name, rect.x, rect.width, FontSizes.TINY, THEME.TEXT_MUTED, rect.y + 23);
     });
 
     const leftPanel = GuiRectangles.LeftPanel;
     const pfpRect = getDiscordPfpRect();
 
-    const editIconSize = 16;
+    const editIconSize = 14;
     const editIconX = leftPanel.x + (leftPanel.width - editIconSize) / 2;
-    const editIconY = pfpRect.y - editIconSize - 15;
+    const editIconY = pfpRect.y - editIconSize - 8;
 
     drawImage(EDIT_ICON_PATH, editIconX, editIconY, editIconSize, editIconSize);
 
@@ -456,12 +487,7 @@ const drawItemBox = (item, itemX, itemY, itemWidth, mouseX, mouseY, cachedItemLa
     const isModuleComponent = item && item.type === 'module-component';
     const isThemeComponent = item && item.type === 'theme-component';
     const isStacked = isDirectComponent || isModuleComponent || isThemeComponent;
-    const moduleBorderColor =
-        item.moduleType === 'developer'
-            ? colorWithAlpha(THEME.NOTIF_WARNING, 0.75)
-            : item.moduleType === 'user'
-              ? colorWithAlpha(THEME.NOTIF_ERROR, 0.75)
-              : null;
+    const moduleBorderColor = getModuleBorderColor(item.moduleType);
     const itemHeight = 48;
     const itemRect = {
         x: itemX,
@@ -482,7 +508,7 @@ const drawItemBox = (item, itemX, itemY, itemWidth, mouseX, mouseY, cachedItemLa
         const centerY = itemY + itemHeight / 2;
         const titleY = centerY - 6;
         const subtitleY = centerY + 6;
-        drawText(item.title, itemX + 12, titleY, FontSizes.REGULAR, THEME.TEXT);
+        drawText(item.title, itemX + 12, titleY, FontSizes.REGULAR, moduleBorderColor || THEME.TEXT);
         if (isDirectComponent && item.sectionName) {
             const sectionText = `Settings • ${item.sectionName}`;
             drawText(sectionText, itemX + 12, subtitleY, FontSizes.SMALL, THEME.TEXT_MUTED);
@@ -496,13 +522,28 @@ const drawItemBox = (item, itemX, itemY, itemWidth, mouseX, mouseY, cachedItemLa
             drawText(sectionText, itemX + 12, subtitleY, FontSizes.SMALL, THEME.TEXT_MUTED);
         }
     } else {
-        const textX = centerText ? itemX + itemWidth / 2 - getTextWidth(item.title, FontSizes.REGULAR) / 2 : itemX + 12;
-        drawText(item.title, textX, itemY + 48 / 2, FontSizes.REGULAR, THEME.TEXT);
+        const words = item.title.split(' ');
+        const lines = words.reduce(
+            (lines, word) => {
+                const line = lines[lines.length - 1];
+                if (line && getTextWidth(`${line} ${word}`, FontSizes.REGULAR) > itemWidth - 16) lines.push(word);
+                else lines[lines.length - 1] = line ? `${line} ${word}` : word;
+                return lines;
+            },
+            ['']
+        );
+        const lineHeight = 12;
+        const textY = itemY + itemHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((line, index) => {
+            const textX = centerText ? itemX + (itemWidth - getTextWidth(line, FontSizes.REGULAR)) / 2 : itemX + 12;
+            drawText(line, textX, textY + index * lineHeight, FontSizes.REGULAR, THEME.TEXT);
+        });
     }
 };
 
 export const drawCategoryItems = (cat, panel, panelX, yOffset, mouseX, mouseY, items, layouts, valid, query = '') => {
-    const iw = (panel.width - PADDING * 2 - ITEM_SPACING * 2) / 3;
+    const columns = panel.width < 300 ? 1 : 3;
+    const iw = (panel.width - PADDING * 2 - ITEM_SPACING * (columns - 1)) / columns;
     let rowIdx = 0;
 
     if (query.length > 0 && items.length === 0) {
@@ -538,16 +579,16 @@ export const drawCategoryItems = (cat, panel, panelX, yOffset, mouseX, mouseY, i
             let subIdx = 0;
 
             g.items.forEach((item) => {
-                if (subIdx % 3 === 0 && subIdx > 0) yOffset += 54;
-                drawItemBox(item, panelX + PADDING + (subIdx % 3) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, true);
+                if (subIdx % columns === 0 && subIdx > 0) yOffset += 54;
+                drawItemBox(item, panelX + PADDING + (subIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, true);
                 subIdx++;
             });
             if (g.items.length > 0) {
                 yOffset += 48;
             }
         } else {
-            if (rowIdx % 3 === 0 && rowIdx > 0) yOffset += 54;
-            drawItemBox(g, panelX + PADDING + (rowIdx % 3) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, false);
+            if (rowIdx % columns === 0 && rowIdx > 0) yOffset += 54;
+            drawItemBox(g, panelX + PADDING + (rowIdx % columns) * (iw + ITEM_SPACING), yOffset, iw, mouseX, mouseY, layouts, valid, false);
             rowIdx++;
         }
     });

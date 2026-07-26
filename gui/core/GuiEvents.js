@@ -8,9 +8,12 @@ import { loadSettings, saveSettings } from '../GuiSave';
 import { clamp, isInside } from '../Utils';
 import { drawGUI } from './GuiRenderer';
 import { GuiRectangles, GuiState } from './GuiState';
+import { macroToggleGui } from '../MacroToggleGui';
 
 const handleClick = (mouseX, mouseY) => {
     if (GuiState.isOpening) return;
+    ({ x: mouseX, y: mouseY } = GuiState.toGuiCoordinates(mouseX, mouseY));
+    if (GuiState.macroToggleOpen) return macroToggleGui.handleClick(mouseX, mouseY);
     if (
         isInside(mouseX, mouseY, GuiRectangles.Background) &&
         !isInside(mouseX, mouseY, GuiRectangles.LeftPanel) &&
@@ -26,12 +29,14 @@ const handleClick = (mouseX, mouseY) => {
 
 const handleMouseDrag = (mouseX, mouseY) => {
     if (GuiState.isOpening) return;
+    ({ x: mouseX, y: mouseY } = GuiState.toGuiCoordinates(mouseX, mouseY));
+    if (GuiState.macroToggleOpen) return;
     if (GuiState.dragging) {
         const newX = mouseX - GuiRectangles.Background.dx;
         const newY = mouseY - GuiRectangles.Background.dy;
 
-        const screenWidth = Renderer.screen.getWidth();
-        const screenHeight = Renderer.screen.getHeight();
+        const screenWidth = GuiState.getGuiWidth();
+        const screenHeight = GuiState.getGuiHeight();
 
         GuiRectangles.Background.x = clamp(newX, 0, screenWidth - GuiRectangles.Background.width);
         GuiRectangles.Background.y = clamp(newY, 0, screenHeight - GuiRectangles.Background.height);
@@ -42,12 +47,15 @@ const handleMouseDrag = (mouseX, mouseY) => {
 
 const handleScroll = (mouseX, mouseY, dir) => {
     if (GuiState.isOpening) return;
+    ({ x: mouseX, y: mouseY } = GuiState.toGuiCoordinates(mouseX, mouseY));
+    if (GuiState.macroToggleOpen) return macroToggleGui.handleScroll(mouseX, mouseY, dir);
     categoryManager?.handleScroll(mouseX, mouseY, dir);
 };
 
 const handleMouseRelease = () => {
     GuiState.dragging = false;
     categoryManager?.handleMouseRelease();
+    GuiState.applyPendingGuiScale();
 };
 
 const handleGuiClosed = () => {
@@ -56,6 +64,7 @@ const handleGuiClosed = () => {
     TextInput.finalizeAllTyping({ playSound: false });
     Slider.finalizeAllTyping();
     SearchBar.resetSearch();
+    macroToggleGui.reset();
     saveSettings();
 };
 
@@ -82,8 +91,7 @@ GuiState.myGui.registerScrolled(handleScroll);
 
 NVG.registerV5Render(() => {
     if (GuiState.myGui.isOpen()) {
-        const mouseX = Client.getMouseX();
-        const mouseY = Client.getMouseY();
+        const { x: mouseX, y: mouseY } = GuiState.toGuiCoordinates(Client.getMouseX(), Client.getMouseY());
         drawGUI(mouseX, mouseY);
     }
 });

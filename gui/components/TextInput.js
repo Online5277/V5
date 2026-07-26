@@ -7,7 +7,6 @@ import {
     createHighlight,
     drawRect,
     drawRoundedRectangle,
-    drawRoundedRectangleWithBorder,
     drawText,
     getTypedCharacter,
     getTextWidth,
@@ -40,7 +39,7 @@ export class TextInput {
         this.textWidth = 0;
 
         this.optionPanelWidth = 0;
-        this.containerHeight = 48;
+        this.containerHeight = 24;
         this.description = null;
         this.highlight = createHighlight();
 
@@ -72,30 +71,18 @@ export class TextInput {
 
     draw(mouseX, mouseY) {
         const componentHeight = this.containerHeight;
-        const backgroundColor = THEME.BG_COMPONENT;
         const textColor = THEME.TEXT;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
 
         this.drawHighlight(panelWidth, componentHeight);
 
-        drawRoundedRectangleWithBorder({
-            x: this.x,
-            y: this.y,
-            width: panelWidth,
-            height: componentHeight,
-            radius: 10,
-            color: backgroundColor,
-            borderWidth: 1,
-            borderColor: THEME.BORDER,
-        });
-
         const titleWidth = getTextWidth(this.title, FontSizes.REGULAR);
-        drawText(this.title, this.x + 12, this.y + componentHeight / 2, FontSizes.REGULAR, textColor);
+        drawText(this.title, this.x, this.y + componentHeight / 2, FontSizes.REGULAR, textColor);
 
         const displayText = this.text;
         const textWidth = getTextWidth(displayText, FontSizes.REGULAR);
         const valuePadding = 8;
-        const boxHeight = 20;
+        const boxHeight = 18;
 
         const maxBoxWidth = Math.max(50, panelWidth - titleWidth - 40);
         const minBoxWidth = 100;
@@ -103,7 +90,7 @@ export class TextInput {
         const desiredWidth = textWidth + valuePadding * 2 + 10;
         const boxWidth = Math.min(maxBoxWidth, Math.max(minBoxWidth, desiredWidth));
 
-        const rightMargin = 12;
+        const rightMargin = 0;
         const boxX = this.x + panelWidth - boxWidth - rightMargin;
         const boxY = this.y + componentHeight / 2 - boxHeight / 2;
 

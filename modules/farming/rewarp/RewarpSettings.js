@@ -67,12 +67,12 @@ class RewarpSettings extends ModuleBase {
         );
         minimumVisitors.visible = false;
         const maxVisitorPrice = this.addSlider(
-            'Max Visitor Price',
+            'Max Visitor Price (k)',
             0,
-            5_000_000,
-            this.maxVisitorPrice,
-            (value) => (this.maxVisitorPrice = Number(value)),
-            'Cancels a Bazaar purchase when its total price is above this amount.'
+            5_000,
+            this.maxVisitorPrice / 1_000,
+            (value) => (this.maxVisitorPrice = Number(value) * 1_000),
+            'Cancels a Bazaar purchase when its total price is above this amount in thousands.'
         );
         maxVisitorPrice.visible = false;
         const declinePurchaseFailures = this.addToggle(

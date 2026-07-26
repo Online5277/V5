@@ -43,6 +43,7 @@ export const SearchBar = {
     hoverBlockRect: null,
     hoverProgress: 0,
     hoverLastUpdate: Date.now(),
+    alignLeft: false,
 
     getPanelAvailableWidth(panel) {
         if (!panel) return this.typingExpandedWidth;
@@ -66,8 +67,13 @@ export const SearchBar = {
         return hasText ? this.getTypingExpandedWidth(panel) : this.getIdleExpandedWidth(panel);
     },
 
-    draw(mouseX, mouseY, panel, y) {
+    getX(panel, width) {
+        return this.alignLeft ? panel.x + PADDING : panel.x + panel.width - PADDING - width;
+    },
+
+    draw(mouseX, mouseY, panel, y, alignLeft = false) {
         if (!panel) return;
+        this.alignLeft = alignLeft;
 
         if (!this.isFocused && this.isExpanded && this.animation > 0.9 && this.query === '') {
             this.isExpanded = false;
@@ -78,7 +84,7 @@ export const SearchBar = {
         const currentWidth = this.animatedWidth;
         const span = Math.max(1, this.getTypingExpandedWidth(panel) - this.collapsedWidth);
         this.animation = Math.max(0, Math.min(1, (currentWidth - this.collapsedWidth) / span));
-        const x = panel.x + panel.width - PADDING - currentWidth;
+        const x = this.getX(panel, currentWidth);
 
         const barRect = { x, y, width: currentWidth, height: this.height };
         const hovered = isInside(mouseX, mouseY, barRect);
@@ -116,16 +122,15 @@ export const SearchBar = {
             });
         }
 
-        const barRightEdge = panel.x + panel.width - PADDING;
-        const iconX = barRightEdge - this.collapsedWidth / 2 - 8;
+        const iconX = this.alignLeft ? x + this.collapsedWidth / 2 - 8 : panel.x + panel.width - PADDING - this.collapsedWidth / 2 - 8;
         const iconY = y + (this.height - 16) / 2;
 
         drawImage(SEARCH_ICON, iconX, iconY, 16, 16);
 
         const fontSize = FontSizes.REGULAR;
-        this.textX = x + 10;
+        this.textX = this.alignLeft ? x + this.collapsedWidth + 6 : x + 10;
         const textY = y + this.height / 2;
-        const visibleTextWidth = Math.max(0, currentWidth - 35);
+        const visibleTextWidth = Math.max(0, currentWidth - (this.alignLeft ? this.collapsedWidth + 10 : 35));
 
         if (visibleTextWidth > 0) {
             NVG.save();
@@ -157,18 +162,16 @@ export const SearchBar = {
     handleClick(mouseX, mouseY, panel, y) {
         if (!panel) return false;
 
-        const barRightEdge = panel.x + panel.width - PADDING;
-        const iconX = barRightEdge - this.collapsedWidth;
-
+        const collapsedX = this.alignLeft ? panel.x + PADDING : panel.x + panel.width - PADDING - this.collapsedWidth;
         const iconRect = {
-            x: iconX,
+            x: collapsedX,
             y: y,
             width: this.collapsedWidth,
             height: this.height,
         };
 
         if (isInside(mouseX, mouseY, iconRect)) {
-            this.isExpanded = !this.isExpanded;
+            this.isExpanded = this.query !== '' || !this.isExpanded;
             this.isFocused = this.isExpanded;
             TypingState.isTyping = this.isFocused;
 
@@ -182,7 +185,7 @@ export const SearchBar = {
 
         if (this.isExpanded) {
             const currentWidth = this.animatedWidth;
-            const barX = barRightEdge - currentWidth;
+            const barX = this.getX(panel, currentWidth);
             const barRect = { x: barX, y, width: currentWidth, height: this.height };
 
             if (isInside(mouseX, mouseY, barRect)) {
@@ -197,7 +200,7 @@ export const SearchBar = {
         }
 
         if (this.isFocused || this.isExpanded) {
-            this.isExpanded = false;
+            this.isExpanded = this.query !== '';
             this.isFocused = false;
             TypingState.isTyping = false;
         }
@@ -217,7 +220,7 @@ export const SearchBar = {
         const KEY_V = 86;
 
         if (keyCode === ESCAPE || keyCode === ENTER) {
-            this.isExpanded = false;
+            this.isExpanded = this.query !== '';
             this.isFocused = false;
             TypingState.isTyping = false;
             playClickSound();
@@ -294,7 +297,7 @@ export const SearchBar = {
     updateHoverBlock(panel, y) {
         if (!panel) return;
         const currentWidth = this.animatedWidth;
-        const x = panel.x + panel.width - PADDING - currentWidth;
+        const x = this.getX(panel, currentWidth);
         this.hoverBlockRect = { x, y, width: currentWidth, height: this.height };
     },
 

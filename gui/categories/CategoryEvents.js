@@ -1,28 +1,30 @@
 import { Popup } from '../components/Popup';
-import { getComponentHitRect, getComponentLayoutHeight, isComponentVisible, layoutDirectComponents } from '../components/layout';
+import {
+    getComponentHitRect,
+    getComponentLayoutHeight,
+    getDirectComponentPanelWidth,
+    getDirectComponentX,
+    isComponentVisible,
+    layoutDirectComponents,
+} from '../components/layout';
 import { GuiRectangles } from '../core/GuiState';
 import { OverlayManager } from '../OverlayUtils';
 import { easeInOutQuad, FontSizes, getTextWidth, isInside, PADDING, playClickSound, SUBCATEGORY_BUTTON_HEIGHT, SUBCATEGORY_BUTTON_SPACING } from '../Utils';
-import { getCategoryRect, getDiscordPfpRect } from './CategoryRenderer';
-import { SearchBar } from './CategorySearchBar';
-import { Categories } from './CategorySystem';
+import { getCategoryContentY, getCategoryRect, getDiscordPfpRect, getModuleNavButtonRect, getModuleNavRect, getModuleNavScrollX } from './CategoryRenderer';
+import { Categories, getVisibleDirectComponents } from './CategorySystem';
 
 const ANIMATION_DURATION = 300;
-const ICON_SIZE = 28;
-const HIGHLIGHT_PADDING = 2;
-const HIGHLIGHT_SIZE = ICON_SIZE + HIGHLIGHT_PADDING * 2;
-
 const getEditButtonRect = () => {
     const leftPanel = GuiRectangles.LeftPanel;
     const pfpRect = getDiscordPfpRect();
-    const editIconSize = 16;
+    const editIconSize = 14;
     const editIconX = leftPanel.x + (leftPanel.width - editIconSize) / 2;
-    const editIconY = pfpRect.y - editIconSize - 15;
+    const editIconY = pfpRect.y - editIconSize - 8;
     return {
-        x: editIconX - 6,
-        y: editIconY - 6,
-        width: editIconSize + 12,
-        height: editIconSize + 12,
+        x: editIconX - 4,
+        y: editIconY - 4,
+        width: editIconSize + 8,
+        height: editIconSize + 8,
     };
 };
 
@@ -35,29 +37,25 @@ const getCategorySelectionRect = (name) => {
     const visibleIndex = Categories.getVisibleCategories().findIndex((category) => category.name === name);
     if (visibleIndex === -1) return getEditButtonRect();
     const rect = getCategoryRect(visibleIndex);
-    return {
-        x: rect.x + (rect.width - ICON_SIZE) / 2 - HIGHLIGHT_PADDING,
-        y: rect.y + (rect.height - ICON_SIZE) / 2 - HIGHLIGHT_PADDING,
-        width: HIGHLIGHT_SIZE,
-        height: HIGHLIGHT_SIZE,
-        radius: 8,
-    };
+    return { ...rect, radius: 8 };
 };
 
 export const handleDirectComponentsClick = (mouseX, mouseY, panel, scrollY, categoryName) => {
     const directCat = Categories.categories.find((c) => c.name === categoryName);
     if (!directCat || !directCat.directComponents) return false;
+    const contentTop = directCat.subcategories.length > 0 ? getCategoryContentY(directCat, panel) : panel.y;
+    if (!isInside(mouseX, mouseY, panel) || mouseY < contentTop) return false;
 
-    for (const row of layoutDirectComponents(directCat.directComponents, panel.y + PADDING - scrollY).rows) {
+    for (const row of layoutDirectComponents(getVisibleDirectComponents(categoryName), getCategoryContentY(directCat, panel) - scrollY).rows) {
         const component = row.component;
 
         if (component instanceof Popup && typeof component.handleButtonClick === 'function') {
             const clickableArea = getComponentHitRect(panel, row.y, row.height, PADDING);
 
             if (isInside(mouseX, mouseY, clickableArea)) {
-                component.x = panel.x + PADDING + 10;
+                component.x = getDirectComponentX(panel);
                 component.y = row.y;
-                component.optionPanelWidth = panel.width;
+                component.optionPanelWidth = getDirectComponentPanelWidth(panel);
                 component.optionPanelHeight = panel.height;
 
                 if (component.handleButtonClick(mouseX, mouseY)) {
@@ -75,9 +73,9 @@ export const handleDirectComponentsClick = (mouseX, mouseY, panel, scrollY, cate
         const clickableArea = getComponentHitRect(panel, row.y, row.height, PADDING);
 
         if (isInside(mouseX, mouseY, clickableArea)) {
-            component.x = panel.x + PADDING + 10;
+            component.x = getDirectComponentX(panel);
             component.y = row.y;
-            component.optionPanelWidth = panel.width;
+            component.optionPanelWidth = getDirectComponentPanelWidth(panel);
             component.optionPanelHeight = panel.height;
 
             if (component.handleClick(mouseX, mouseY)) {
@@ -132,7 +130,7 @@ export const handleCategoryClick = (
         const backButtonWidth = getTextWidth(backButtonText, FontSizes.SMALL);
         const drawnBackY = optionY + 12 - sY;
         const backButtonRect = {
-            x: optionX + 10,
+            x: optionX,
             y: drawnBackY,
             width: backButtonWidth,
             height: 10,
@@ -171,7 +169,7 @@ export const handleCategoryClick = (
                 const drawnCompY = currentDrawnCompY;
                 let handled = false;
 
-                component.x = optionX + 10;
+                component.x = optionX;
 
                 const componentHeight = getComponentLayoutHeight(component, true);
 
@@ -206,7 +204,7 @@ export const handleCategoryClick = (
             const drawnCompY = currentDrawnCompY;
             let handled = false;
 
-            component.x = optionX + 10;
+            component.x = optionX;
 
             const componentHeight = getComponentLayoutHeight(component, true);
 
@@ -253,9 +251,6 @@ export const handleCategoryClick = (
 
         if (clickedCategoryName && clickedCategoryName !== Categories.selected) {
             Categories.optionsReturnCategory = null;
-            if (clickedCategoryName !== 'Modules') {
-                SearchBar.resetSearch();
-            }
             const oldRect = getCategorySelectionRect(Categories.selected);
             const newRect = getCategorySelectionRect(clickedCategoryName);
             const oldMidY = oldRect.y + oldRect.height / 2;
@@ -297,20 +292,60 @@ export const handleCategoryClick = (
         }
     }
 
+    if (Categories.currentPage === 'categories') {
+        const cat = Categories.categories.find((c) => c.name === Categories.selected);
+        const navRect = getModuleNavRect();
+        if (cat?.subcategories.length > 0 && isInside(mouseX, mouseY, navRect)) {
+            const scrollX = getModuleNavScrollX(cat);
+            ['All', ...cat.subcategories].forEach((subcat, index) => {
+                const rawButtonRect = getModuleNavButtonRect(cat, index);
+                const buttonRect = { ...rawButtonRect, x: rawButtonRect.x - scrollX };
+                if (!isInside(mouseX, mouseY, buttonRect)) return;
+
+                const newSubcatName = subcat === 'All' ? null : subcat;
+                if (Categories.selectedSubcategory !== newSubcatName) {
+                    const oldRect = Categories.selectedSubcategoryButton || rawButtonRect;
+                    Categories.selectedSubcategory = newSubcatName;
+                    invalidateContentHeightCache();
+                    invalidateLayoutCache();
+                    Categories.subcatTransitionStart = Date.now();
+                    Categories.subcatTransitionProgress = 0;
+                    Categories.animationRect = {
+                        startX: oldRect.x,
+                        startY: oldRect.y,
+                        startWidth: oldRect.width,
+                        startHeight: oldRect.height,
+                        endX: rawButtonRect.x,
+                        endY: rawButtonRect.y,
+                        endWidth: rawButtonRect.width,
+                        endHeight: rawButtonRect.height,
+                        x: oldRect.x,
+                        y: oldRect.y,
+                        width: oldRect.width,
+                        height: oldRect.height,
+                    };
+                    Categories.selectedSubcategoryButton = rawButtonRect;
+                    resetCategoryScroll();
+                }
+                playClickSound();
+            });
+            return;
+        }
+    }
+
     if (Categories.selected && Categories.currentPage === 'categories' && isInsidePanel) {
         const cat = Categories.categories.find((c) => c.name === Categories.selected);
-        if (cat && Categories.selected !== 'Settings' && Categories.selected !== 'Theme') {
-            if (cat.subcategories.length > 0 && SearchBar.query.trim().length === 0 && !SearchBar.isHoverBlocked(mouseX, mouseY)) {
-                let currentX = panel.x + PADDING;
-                let yOffset = panel.y + PADDING - scrollY;
+        if (cat && !cat.directComponents) {
+            if (cat.subcategories.length > 0 && cat.name !== 'Modules') {
+                const navRect = getModuleNavRect(panel);
+                let currentY = navRect.y + 4;
                 const subcategoriesToDraw = ['All', ...cat.subcategories];
 
                 for (const subcat of subcategoriesToDraw) {
-                    const buttonTextWidth = getTextWidth(subcat, FontSizes.MEDIUM) + 20;
                     const buttonRect = {
-                        x: currentX,
-                        y: yOffset,
-                        width: buttonTextWidth,
+                        x: navRect.x + 2,
+                        y: currentY,
+                        width: navRect.width - 4,
                         height: SUBCATEGORY_BUTTON_HEIGHT,
                     };
                     if (isInside(mouseX, mouseY, buttonRect)) {
@@ -342,7 +377,7 @@ export const handleCategoryClick = (
                         playClickSound();
                         return;
                     }
-                    currentX += buttonTextWidth + SUBCATEGORY_BUTTON_SPACING;
+                    currentY += SUBCATEGORY_BUTTON_HEIGHT + SUBCATEGORY_BUTTON_SPACING;
                 }
             }
 
@@ -402,7 +437,8 @@ export const handleCategoryScroll = (
     if (Categories.currentPage === 'categories') {
         const directCat = Categories.categories.find((c) => c.name === Categories.selected);
         if (directCat?.directComponents && isInside(mouseX, mouseY, panel)) {
-            const openPopup = directCat.directComponents.find((component) => isComponentVisible(component) && component instanceof Popup && component.isOpen);
+            const components = getVisibleDirectComponents(Categories.selected);
+            const openPopup = components.find((component) => isComponentVisible(component) && component instanceof Popup && component.isOpen);
             if (openPopup && typeof openPopup.handleScroll === 'function') {
                 openPopup.optionPanelWidth = panel.width;
                 openPopup.handleScroll(mouseX, mouseY, dir);
@@ -410,29 +446,17 @@ export const handleCategoryScroll = (
             }
 
             let scrollHandled = false;
-            const components = directCat.directComponents;
-            let componentY = panel.y + PADDING;
-            let currentSection = null;
-
-            components.filter(isComponentVisible).forEach((component, index) => {
-                if (component.sectionName && component.sectionName !== currentSection) {
-                    currentSection = component.sectionName;
-                    if (index > 0) componentY += 16;
-                    componentY += 26;
-                }
-
-                const compHeight = getComponentLayoutHeight(component);
+            layoutDirectComponents(components, getCategoryContentY(directCat, panel)).rows.forEach(({ component, y: componentY, height: compHeight }) => {
                 const compRect = {
-                    x: panel.x + PADDING + 10,
+                    x: getDirectComponentX(panel),
                     y: componentY - rightPanelScrollY,
-                    width: panel.width - PADDING * 2 - 20,
+                    width: getDirectComponentPanelWidth(panel) - PADDING * 2,
                     height: compHeight,
                 };
                 if (isInside(mouseX, mouseY, compRect) && typeof component.handleScroll === 'function') {
-                    component.optionPanelWidth = panel.width;
+                    component.optionPanelWidth = getDirectComponentPanelWidth(panel);
                     if (component.handleScroll(mouseX, mouseY, dir)) scrollHandled = true;
                 }
-                componentY += compHeight;
             });
 
             if (!scrollHandled) {
@@ -463,9 +487,9 @@ export const handleCategoryScroll = (
                 if (!isComponentVisible(component)) return;
                 const compHeight = getComponentLayoutHeight(component, true);
                 const compRect = {
-                    x: optionX + 10,
+                    x: optionX,
                     y: componentY - Categories.optionsScrollY,
-                    width: panel.width - PADDING * 2 - 20,
+                    width: panel.width - PADDING * 2,
                     height: compHeight,
                 };
                 if (isInside(mouseX, mouseY, compRect) && typeof component.handleScroll === 'function') {

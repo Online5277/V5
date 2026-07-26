@@ -83,13 +83,13 @@ export class MultiToggle {
             this.options[0].animationProgress = 1;
         }
         this.expanded = false;
-        this.optionHeight = 32;
-        this.containerHeight = 48;
+        this.optionHeight = 18;
+        this.containerHeight = 24;
         this.callback = callback;
         this.optionPanelWidth = 0;
-        this.dropdownPadding = 8;
-        this.optionSpacing = 4;
-        this.dropdownOuterPadding = 2;
+        this.dropdownPadding = 6;
+        this.optionSpacing = 3;
+        this.dropdownOuterPadding = 10;
 
         this.animStart = 0;
         this.animFrom = 0;
@@ -163,29 +163,38 @@ export class MultiToggle {
         this.updateAnimation();
         this.updateToggleAnimations();
 
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
         const textColor = THEME.TEXT;
         const cornerRadius = 10;
 
         this.drawHighlight(panelWidth, this.containerHeight);
 
+        drawText(this.title, this.x, this.y + this.containerHeight / 2, FontSizes.REGULAR, textColor);
+
+        const arrowSize = 10;
+        const rightMargin = 6;
+        const selectWidth = 80;
+        const selectX = this.x + panelWidth - selectWidth;
+        const arrowX = selectX + selectWidth - arrowSize - rightMargin;
+        const arrowY = this.y + (this.containerHeight - arrowSize) / 2;
+
         drawRoundedRectangleWithBorder({
-            x: this.x,
-            y: this.y,
-            width: panelWidth,
-            height: this.containerHeight,
-            radius: cornerRadius,
+            x: selectX,
+            y: this.y + this.containerHeight / 2 - 9,
+            width: selectWidth,
+            height: 18,
+            radius: 6,
             color: THEME.BG_COMPONENT,
             borderWidth: 1,
             borderColor: THEME.BORDER,
         });
 
-        drawText(this.title, this.x + 12, this.y + this.containerHeight / 2, FontSizes.REGULAR, textColor);
-
-        const arrowSize = 16;
-        const rightMargin = 16;
-        const arrowX = this.x + panelWidth - arrowSize - rightMargin;
-        const arrowY = this.y + (this.containerHeight - arrowSize) / 2;
+        const selected = this.options.filter((option) => option.enabled);
+        const selectedText = selected.length === 1 ? selected[0].name : selected.length > 1 ? '...' : 'None';
+        NVG.save();
+        NVG.scissor(selectX + 10, this.y + this.containerHeight / 2 - 9, arrowX - selectX - 12, 18);
+        drawText(selectedText, selectX + 10, this.y + this.containerHeight / 2, FontSizes.REGULAR, textColor);
+        NVG.restore();
 
         drawRoundedRectangle({
             x: arrowX,
@@ -238,7 +247,7 @@ export class MultiToggle {
                 const optionTop = currentY;
                 if (optionTop >= dropdownY + animatedHeight) break;
                 const option = this.options[i];
-                const optionX = this.x + 12;
+                const optionX = this.x + 10;
 
                 const isOptionHovered = isInside(mouseX, mouseY, {
                     x: dropdownX,
@@ -258,9 +267,9 @@ export class MultiToggle {
                     });
                 }
 
-                const switchWidth = 36;
-                const switchHeight = 20;
-                const switchX = this.x + panelWidth - switchWidth - 12;
+                const switchWidth = 26;
+                const switchHeight = 16;
+                const switchX = this.x + panelWidth - switchWidth - 10;
                 const switchY = optionTop + (this.optionHeight - switchHeight) / 2;
 
                 const trackColor = interpolateColor(THEME.SWITCH_OFF, THEME.ACCENT, option.animationProgress);
@@ -274,7 +283,7 @@ export class MultiToggle {
                     color: trackColor,
                 });
 
-                const knobSize = 14;
+                const knobSize = 10;
                 const knobPadding = 3;
                 const knobX = switchX + knobPadding + (switchWidth - knobSize - knobPadding * 2) * option.animationProgress;
                 const knobY = switchY + switchHeight / 2 - knobSize / 2;
@@ -299,7 +308,7 @@ export class MultiToggle {
     }
 
     handleClick(mouseX, mouseY) {
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
 
         if (mouseX >= this.x && mouseX <= this.x + panelWidth && mouseY >= this.y && mouseY <= this.y + this.containerHeight) {
             this.expanded = !this.expanded;

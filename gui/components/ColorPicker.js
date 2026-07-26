@@ -36,8 +36,8 @@ export class ColorPicker {
         this.alpha = this.color.getAlpha() / 255;
 
         this.expanded = false;
-        this.height = 48;
-        this.outerPadding = 2;
+        this.height = 24;
+        this.outerPadding = 10;
         this.expandedHeight = 193;
         this.optionPanelWidth = 0;
         this.panelPaddingY = 10;
@@ -171,26 +171,15 @@ export class ColorPicker {
     draw(mouseX, mouseY) {
         this.updateAnimation();
 
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-        const collapsedHeight = 48;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
+        const collapsedHeight = 24;
 
         this.drawHighlight(panelWidth, collapsedHeight);
 
-        drawRoundedRectangleWithBorder({
-            x: this.x,
-            y: this.y,
-            width: panelWidth,
-            height: collapsedHeight,
-            radius: 10,
-            color: THEME.BG_COMPONENT,
-            borderWidth: 1,
-            borderColor: THEME.BORDER,
-        });
+        drawText(this.title, this.x, this.y + collapsedHeight / 2, FontSizes.REGULAR, THEME.TEXT);
 
-        drawText(this.title, this.x + 12, this.y + collapsedHeight / 2, FontSizes.REGULAR, THEME.TEXT);
-
-        const previewSize = 26;
-        const previewX = this.x + panelWidth - previewSize - 12;
+        const previewSize = 18;
+        const previewX = this.x + panelWidth - previewSize;
         const previewY = this.y + (collapsedHeight - previewSize) / 2;
 
         this.drawCheckerboard(previewX, previewY, previewSize, previewSize, 6, 4);
@@ -205,8 +194,8 @@ export class ColorPicker {
         });
         NVG.drawHollowRect(previewX, previewY, previewSize, previewSize, 2, THEME.BORDER.getRGB(), 6);
 
-        const arrowSize = 16;
-        const arrowX = previewX - arrowSize - 10;
+        const arrowSize = 10;
+        const arrowX = previewX - arrowSize - 6;
         const arrowY = this.y + (collapsedHeight - arrowSize) / 2;
 
         const isArrowHovered = isInside(mouseX, mouseY, { x: arrowX, y: arrowY, width: arrowSize, height: arrowSize });
@@ -327,8 +316,8 @@ export class ColorPicker {
     }
 
     handleClick(mouseX, mouseY) {
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-        const collapsedHeight = 48;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
+        const collapsedHeight = 24;
 
         if (mouseX >= this.x && mouseX <= this.x + panelWidth && mouseY >= this.y && mouseY <= this.y + collapsedHeight) {
             this.expanded = !this.expanded;
@@ -374,11 +363,11 @@ export class ColorPicker {
 
     handleMouseDrag(mouseX, mouseY) {
         if (!this.expanded) return;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
         const pickerPadding = 12;
         const innerWidth = panelWidth - pickerPadding * 2;
         const svHeight = 95;
-        const contentY = this.y + 48 + 4;
+        const contentY = this.y + 24 + 4;
         const svY = contentY + this.panelPaddingY;
         const svX = this.x + pickerPadding;
 

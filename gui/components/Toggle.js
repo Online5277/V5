@@ -1,16 +1,4 @@
-import {
-    createHighlight,
-    drawRoundedRectangle,
-    drawRoundedRectangleWithBorder,
-    drawText,
-    easeOutCubic,
-    FontSizes,
-    interpolateColor,
-    isInside,
-    PADDING,
-    playClickSound,
-    THEME,
-} from '../Utils';
+import { createHighlight, drawRoundedRectangle, drawText, easeOutCubic, FontSizes, interpolateColor, isInside, PADDING, playClickSound, THEME } from '../Utils';
 import { setTooltip } from '../core/GuiTooltip';
 
 export class ToggleButton {
@@ -68,27 +56,16 @@ export class ToggleButton {
     draw(mouseX, mouseY) {
         this.updateAnimation();
 
-        const componentHeight = 48;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const componentHeight = 24;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
 
         this.drawHighlight(panelWidth, componentHeight);
 
-        drawRoundedRectangleWithBorder({
-            x: this.x,
-            y: this.y,
-            width: panelWidth,
-            height: componentHeight,
-            radius: 10,
-            color: THEME.BG_COMPONENT,
-            borderWidth: 1,
-            borderColor: THEME.BORDER,
-        });
+        drawText(this.title, this.x, this.y + componentHeight / 2, FontSizes.REGULAR, THEME.TEXT);
 
-        drawText(this.title, this.x + 12, this.y + componentHeight / 2, FontSizes.REGULAR, THEME.TEXT);
-
-        const switchWidth = 36;
-        const switchHeight = 20;
-        const rightMargin = 12;
+        const switchWidth = 26;
+        const switchHeight = 16;
+        const rightMargin = 0;
 
         const switchX = this.x + panelWidth - switchWidth - rightMargin;
         const switchY = this.y + componentHeight / 2 - switchHeight / 2;
@@ -104,7 +81,7 @@ export class ToggleButton {
             color: trackColor,
         });
 
-        const knobSize = 14;
+        const knobSize = 10;
         const knobPadding = 3;
         const knobX = switchX + knobPadding + (switchWidth - knobSize - knobPadding * 2) * this.animationProgress;
         const knobY = switchY + switchHeight / 2 - knobSize / 2;
@@ -131,8 +108,8 @@ export class ToggleButton {
     }
 
     handleClick(mouseX, mouseY) {
-        const componentHeight = 48;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const componentHeight = 24;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
 
         const componentRect = {
             x: this.x,

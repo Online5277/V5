@@ -1,4 +1,5 @@
 import { FontSizes, THEME, drawRoundedRectangleWithBorder, drawText, getTextWidth } from '../Utils';
+import { GuiState } from './GuiState';
 
 export const GuiTooltip = {
     tooltipToDraw: null,
@@ -40,8 +41,8 @@ export const GuiTooltip = {
         let tooltipX = mouseX + MOUSE_OFFSET_X;
         let tooltipY = mouseY + MOUSE_OFFSET_Y;
 
-        const screenWidth = Renderer.screen.getWidth();
-        const screenHeight = Renderer.screen.getHeight();
+        const screenWidth = GuiState.getGuiWidth();
+        const screenHeight = GuiState.getGuiHeight();
 
         if (tooltipX + tooltipWidth > screenWidth) tooltipX = mouseX - tooltipWidth - MOUSE_OFFSET_X;
 

@@ -6,7 +6,6 @@ import {
     clamp,
     createHighlight,
     drawRoundedRectangle,
-    drawRoundedRectangleWithBorder,
     drawText,
     getTypedCharacter,
     getTextWidth,
@@ -17,6 +16,17 @@ import { setTooltip } from '../core/GuiTooltip';
 import { GuiState } from '../core/GuiState';
 
 const allSliders = [];
+
+const wrapTitle = (title, maxWidth) =>
+    title.split(' ').reduce(
+        (lines, word) => {
+            const line = lines[lines.length - 1];
+            if (line && getTextWidth(`${line} ${word}`, FontSizes.REGULAR) > maxWidth) lines.push(word);
+            else lines[lines.length - 1] = line ? `${line} ${word}` : word;
+            return lines;
+        },
+        ['']
+    );
 
 export class Slider {
     constructor(title, min = 0, max = 100, x, y, width = 100, height = 5, value = 50, callback = null, isRange = false) {
@@ -65,10 +75,11 @@ export class Slider {
         this.inputValue = String((this.isRange ? this.value.low : this.value).toFixed(this.precision));
 
         this.optionPanelWidth = 0;
-        this.containerHeight = 48;
+        this.containerHeight = 26;
         this.callback = callback;
         this.description = null;
         this.valueRects = {};
+        this.sliderRect = {};
         this.highlight = createHighlight();
         allSliders.push(this);
 
@@ -98,31 +109,33 @@ export class Slider {
     }
 
     draw(mouseX, mouseY) {
-        const componentHeight = this.containerHeight;
-        const backgroundColor = THEME.BG_COMPONENT;
         const textColor = THEME.TEXT;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
+        const panelWidth = this.optionPanelWidth - PADDING * 2;
+        const sliderWidth = 105;
+        const valueKeys = this.isRange ? ['low', 'high'] : ['value'];
+        const displayValues = valueKeys.map((key) =>
+            this.isTyping && this.typingHandle === key ? this.inputValue : (this.isRange ? this.value[key] : this.value).toFixed(this.precision)
+        );
+        const valuePadding = 8;
+        const valueBoxHeight = 18;
+        const valueBoxGap = 4;
+        const valueBoxWidths = displayValues.map((displayValue) => Math.max(40, getTextWidth(displayValue, FontSizes.REGULAR) + valuePadding * 2));
+        const valueBoxesWidth = valueBoxWidths.reduce((total, width) => total + width, 0) + valueBoxGap * (valueKeys.length - 1);
+        const valueStringX = this.x + panelWidth - valueBoxesWidth;
+        const sliderX = valueStringX - sliderWidth - 14;
+        const titleLines = wrapTitle(this.title, sliderX - this.x - 12);
+        const componentHeight = Math.max(this.containerHeight, titleLines.length * 12 + 12);
+        this.layoutHeight = componentHeight;
 
         this.drawHighlight(panelWidth, componentHeight);
+        titleLines.forEach((line, index) =>
+            drawText(line, this.x, this.y + componentHeight / 2 - ((titleLines.length - 1) * 12) / 2 + index * 12, FontSizes.REGULAR, textColor)
+        );
 
-        drawRoundedRectangleWithBorder({
-            x: this.x,
-            y: this.y,
-            width: panelWidth,
-            height: componentHeight,
-            radius: 10,
-            color: backgroundColor,
-            borderWidth: 1,
-            borderColor: THEME.BORDER,
-        });
-
-        drawText(this.title, this.x + 12, this.y + componentHeight / 2, FontSizes.REGULAR, textColor);
-
-        const sliderWidth = 140;
-        const rightMargin = 12;
-        const sliderX = this.x + panelWidth - sliderWidth - rightMargin;
+        const valueStringY = this.y + componentHeight / 2 - valueBoxHeight / 2;
         const sliderY = this.y + componentHeight / 2 - 3;
         const sliderHeight = 6;
+        this.sliderRect = { x: sliderX, y: sliderY, width: sliderWidth, height: sliderHeight };
         const foregroundColor = THEME.ACCENT;
         const handleColor = THEME.KNOB;
 
@@ -135,7 +148,7 @@ export class Slider {
             color: THEME.BG_INSET,
         });
 
-        const handleSize = 14;
+        const handleSize = 8;
 
         if (this.isRange) {
             const span = this.getRangeSpan();
@@ -197,18 +210,8 @@ export class Slider {
             });
         }
 
-        const valueKeys = this.isRange ? ['low', 'high'] : ['value'];
-        const displayValues = valueKeys.map((key) =>
-            this.isTyping && this.typingHandle === key ? this.inputValue : (this.isRange ? this.value[key] : this.value).toFixed(this.precision)
-        );
-        const valuePadding = 8;
-        const valueBoxHeight = 20;
-        const valueStringY = this.y + componentHeight / 2 - valueBoxHeight / 2;
-        const valueBoxGap = 4;
-        const valueBoxWidths = displayValues.map((displayValue) => Math.max(40, getTextWidth(displayValue, FontSizes.REGULAR) + valuePadding * 2));
-        let valueStringX = sliderX - valueBoxWidths.reduce((total, width) => total + width, 0) - valueBoxGap * (valueKeys.length - 1) - 8;
-
         this.valueRects = {};
+        let currentValueX = valueStringX;
         valueKeys.forEach((key, index) => {
             const displayValue = displayValues[index];
             const valueStringWidth = getTextWidth(displayValue, FontSizes.REGULAR);
@@ -216,14 +219,14 @@ export class Slider {
             const isActive = this.isTyping && this.typingHandle === key;
 
             this.valueRects[key] = {
-                x: valueStringX,
+                x: currentValueX,
                 y: valueStringY,
                 width: valueBoxWidth,
                 height: valueBoxHeight,
             };
 
             drawRoundedRectangle({
-                x: valueStringX,
+                x: currentValueX,
                 y: valueStringY,
                 width: valueBoxWidth,
                 height: valueBoxHeight,
@@ -231,10 +234,10 @@ export class Slider {
                 color: isActive ? THEME.ACCENT : THEME.BG_INSET,
             });
 
-            const textCenteredX = valueStringX + valueBoxWidth / 2 - valueStringWidth / 2;
+            const textCenteredX = currentValueX + valueBoxWidth / 2 - valueStringWidth / 2;
             drawText(displayValue, textCenteredX, valueStringY + valueBoxHeight / 2, FontSizes.REGULAR, THEME.TEXT_DIM);
 
-            valueStringX += valueBoxWidth + valueBoxGap;
+            currentValueX += valueBoxWidth + valueBoxGap;
         });
 
         const componentRect = {
@@ -279,11 +282,7 @@ export class Slider {
         if (this.checkSliderClick(mouseX, mouseY)) {
             this.dragging = true;
             if (this.isRange) {
-                const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-                const sliderWidth = 140;
-                const rightMargin = 12;
-                const sliderX = this.x + panelWidth - sliderWidth - rightMargin;
-                const progress = clamp((mouseX - sliderX) / sliderWidth, 0, 1);
+                const progress = clamp((mouseX - this.sliderRect.x) / this.sliderRect.width, 0, 1);
                 const val = this.min + this.getRangeSpan() * progress;
 
                 const distLow = Math.abs(val - this.value.low);
@@ -299,14 +298,8 @@ export class Slider {
     }
 
     checkSliderClick(mouseX, mouseY) {
-        const componentHeight = this.containerHeight;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-        const sliderWidth = 140;
-        const rightMargin = 12;
-        const sliderX = this.x + panelWidth - sliderWidth - rightMargin;
-        const sliderY = this.y + componentHeight / 2 - 8;
-
-        return mouseX >= sliderX && mouseX <= sliderX + sliderWidth && mouseY >= sliderY && mouseY <= sliderY + 16;
+        const { x, y, width, height } = this.sliderRect;
+        return mouseX >= x && mouseX <= x + width && mouseY >= y - 5 && mouseY <= y + height + 5;
     }
 
     handleMouseDrag(mouseX, mouseY) {
@@ -400,13 +393,7 @@ export class Slider {
     }
 
     updateValue(mouseX) {
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-        const sliderWidth = 140;
-        const rightMargin = 12;
-
-        const sliderX = this.x + panelWidth - sliderWidth - rightMargin;
-
-        const progress = clamp((mouseX - sliderX) / sliderWidth, 0, 1);
+        const progress = clamp((mouseX - this.sliderRect.x) / this.sliderRect.width, 0, 1);
 
         const rawValue = this.min + this.getRangeSpan() * progress;
         const steppedValue = Math.round(rawValue / this.step) * this.step;
@@ -433,18 +420,13 @@ export class Slider {
     }
 
     handleScroll(mouseX, mouseY, dir) {
-        const componentHeight = this.containerHeight;
-        const panelWidth = this.optionPanelWidth - PADDING * 2 - 20;
-        const sliderWidth = 140;
-        const rightMargin = 12;
-        const sliderX = this.x + panelWidth - sliderWidth - rightMargin;
-        const sliderY = this.y + componentHeight / 2 - 8;
+        const { x, y, width, height } = this.sliderRect;
 
-        if (mouseX >= sliderX && mouseX <= sliderX + sliderWidth && mouseY >= sliderY && mouseY <= sliderY + 16) {
+        if (mouseX >= x && mouseX <= x + width && mouseY >= y - 5 && mouseY <= y + height + 5) {
             const step = dir > 0 ? this.step : -this.step;
 
             if (this.isRange) {
-                const progress = clamp((mouseX - sliderX) / sliderWidth, 0, 1);
+                const progress = clamp((mouseX - x) / width, 0, 1);
                 const val = this.min + this.getRangeSpan() * progress;
                 const distLow = Math.abs(val - this.value.low);
                 const distHigh = Math.abs(val - this.value.high);

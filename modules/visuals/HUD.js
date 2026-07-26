@@ -3,6 +3,7 @@ import { ModuleBase } from '../../utils/ModuleBase';
 import { Utils } from '../../utils/Utils';
 import { ServerInfo } from '../../utils/player/ServerInfo';
 import { OverlayManager } from '../../gui/OverlayUtils';
+import { GuiState } from '../../gui/core/GuiState';
 
 class HUD extends ModuleBase {
     constructor() {
@@ -162,7 +163,7 @@ class HUD extends ModuleBase {
     }
 
     prepareOverlay(enabled, recalc) {
-        if (OverlayManager.drawingGUI || !enabled || !this.worldLoaded) return false;
+        if (GuiState.myGui.isOpen() || OverlayManager.drawingGUI || !enabled || !this.worldLoaded) return false;
 
         this.syncFromOverlayEditor();
 

@@ -8,17 +8,17 @@ const withAlpha = (color, alpha) => {
 };
 
 const DEFAULT_THEME = {
-    BG_WINDOW: new Color(0.09, 0.1, 0.13, 1),
-    BG_OVERLAY: new Color(0.06, 0.07, 0.09, 0.85),
-    BG_COMPONENT: new Color(0.11, 0.12, 0.15, 1),
-    HOVER: new Color(0.17, 0.18, 0.22, 1),
-    ACCENT: new Color(0.4, 0.7, 1, 1),
-    BORDER: new Color(0.2, 0.21, 0.24, 1),
+    BG_WINDOW: new Color(0.07, 0.06, 0.055, 1),
+    BG_OVERLAY: new Color(0, 0, 0, 0.8),
+    BG_COMPONENT: new Color(0.09, 0.075, 0.07, 1),
+    HOVER: new Color(0.15, 0.12, 0.115, 1),
+    ACCENT: new Color(0.9, 0.77, 0.73, 1),
+    BORDER: new Color(0.3, 0.26, 0.24, 1),
     OV_WINDOW: new Color(0.04, 0.04, 0.04, 0.75),
     OV_BORDER: new Color(0.4, 0.7, 1.0, 0.0),
     OV_ACCENT: new Color(0.4, 0.7, 1.0, 1),
-    TEXT: 0xffffffff,
-    TEXT_MUTED: 0xff99a3b0,
+    TEXT: 0xffeeeeee,
+    TEXT_MUTED: 0xffaaaaaa,
 };
 
 const setPickerColor = (picker, value) => {

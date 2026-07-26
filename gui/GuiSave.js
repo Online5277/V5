@@ -14,7 +14,8 @@ import { ToggleButton } from './components/Toggle';
 export const SettingsMap = new Map();
 
 const getCategoryItems = (category) => category.items.reduce((acc, group) => acc.concat(group.type === 'separator' ? group.items : [group]), []);
-const getDirectComponentParentName = (category, component) => (category.name === 'Settings' && component.sectionName ? component.sectionName : category.name);
+const getDirectComponentParentName = (category, component) =>
+    category.name === 'Theme' ? 'Theme V2' : category.name === 'Settings' && component.sectionName ? component.sectionName : category.name;
 
 function buildSettingsMapFromComponents() {
     SettingsMap.clear();

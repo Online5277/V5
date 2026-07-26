@@ -47,6 +47,9 @@ export const Categories = {
     transitionStart: 0,
     selectedSubcategory: null,
     selectedSubcategoryButton: null,
+    subcatScrollCategory: null,
+    subcatScrollX: 0,
+    subcatScrollUpdatedAt: 0,
     subcatTransitionProgress: 1,
     subcatTransitionStart: 0,
     subcatAnimationDuration: 200,
@@ -175,6 +178,9 @@ export const Categories = {
             settingsCat.directComponents = [];
         }
 
+        if (sectionName && !settingsCat.subcategories.includes(sectionName)) {
+            settingsCat.subcategories.push(sectionName);
+        }
         component.sectionName = sectionName;
         if (description !== undefined) component.description = description;
         settingsCat.directComponents.push(component);
@@ -259,4 +265,12 @@ export const Categories = {
         const settingsCat = Categories.categories.find((c) => c.name === categoryName);
         return settingsCat?.directComponents || [];
     },
+};
+
+export const getVisibleDirectComponents = (categoryName) => {
+    const category = Categories.categories.find((item) => item.name === categoryName);
+    if (!category?.directComponents) return [];
+    return Categories.selectedSubcategory === null
+        ? category.directComponents
+        : category.directComponents.filter((component) => component.sectionName === Categories.selectedSubcategory);
 };
