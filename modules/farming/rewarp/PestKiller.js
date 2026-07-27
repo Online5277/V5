@@ -230,7 +230,7 @@ class PestKiller {
         const z = this.lastParticle.z + (dz / length) * 40;
         this.state = STATES.PATHING_PARTICLES;
         this.startPath(this.verticalGoals(x, z), (success) => {
-            this.state = PATHING_PESTS;
+            this.state = STATES.PATHING_PESTS;
         });
     }
 
