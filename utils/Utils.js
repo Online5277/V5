@@ -519,6 +519,7 @@ class UtilsClass {
         return { gardenPests, currentPlot, currentPlotPests };
     }
 
+    // This doesnt work for some users. please fix.
     getCurrentMana() {
         return manaDetector.getCurrentMana();
     }

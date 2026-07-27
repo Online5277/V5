@@ -4,7 +4,6 @@ import { MacroState } from '../../utils/MacroState';
 import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
 import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';
-import { Utils } from '../../utils/Utils';
 
 const FALLBACK_TARGET = { x: -648, y: 124, z: 5 };
 const TARGET_TIMEOUT_MS = 2000;
@@ -62,6 +61,10 @@ class MudwormMacro extends ModuleBase {
         );
 
         this.on('tick', () => this.onTick());
+        this.on('actionBar', (text) => {
+            if (!this.enabled || this.rewarping || !ChatLib.removeFormatting(text).includes('NOT ENOUGH MANA')) return;
+            this.rewarp('Not enough mana.');
+        }).setCriteria('${text}');
         this.on('chat', (event) => this.trackShards(event));
         this.on('worldUnload', () => this.onWorldUnload());
         this.on('worldLoad', () => this.onWorldLoad());
@@ -74,9 +77,6 @@ class MudwormMacro extends ModuleBase {
             this.waitingForEntities = false;
             this.message('&aResumed.');
         }
-        const mana = Utils.getCurrentMana();
-        this.message(`Current Mana = ${mana}. report this to rdbt`);
-        if (mana !== null && mana < 100) return this.rewarp();
         if (this.currentTarget && Date.now() - this.targetStartedAt >= TARGET_TIMEOUT_MS) return this.blacklistCurrentTarget();
         if (this.busy || EtherwarpPathfinder.isPathing()) return;
 
@@ -126,7 +126,7 @@ class MudwormMacro extends ModuleBase {
     clickTarget(target, token) {
         if (!this.isCurrentAction(token)) return;
 
-        if (!Rotations.lookAtAngles(Player.getYaw(), 90)) return this.finishTarget(target, token);
+        if (!Rotations.lookAtAngles(Player.getYaw(), 90, { speedMultiplier: 999 })) return this.finishTarget(target, token);
         Rotations.onComplete(() => {
             if (!this.isCurrentAction(token)) return;
             Client.leftClick();
@@ -214,7 +214,7 @@ class MudwormMacro extends ModuleBase {
         });
     }
 
-    rewarp(reason = 'Mana below 100.') {
+    rewarp(reason = 'Not enough mana.') {
         this.rewarping = true;
         this.waitingForEntities = false;
         this.waitingForGalateaWorld = false;
