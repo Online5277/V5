@@ -8,7 +8,7 @@ import { Utils } from '../../../utils/Utils';
 
 const ANGRY_VILLAGER = net.minecraft.core.particles.ParticleTypes.ANGRY_VILLAGER;
 const PEST_RANGE_SQ = 10 ** 2;
-const PARTICLE_SEARCH_MS = 2_000;
+const PARTICLE_SEARCH_MS = 1_000;
 const PLOT_TIMEOUT_MS = 30_000;
 const STATES = {
     SEARCHING: 'Searching',
@@ -46,8 +46,7 @@ class PestKiller {
             return true;
         }
 
-        const pestsRemainInCurrentPlot = currentPlot === this.currentPlot ? currentPlotPests : null;
-        if (pestsRemainInCurrentPlot === 0) {
+        if (currentPlot === this.currentPlot && currentPlotPests === 0) {
             this.completeCurrentPlot();
             return false;
         }
@@ -72,9 +71,9 @@ class PestKiller {
             this.stopKilling();
         }
 
-        if (!pests.length) {
+        if (!pests.length && this.state === STATES.SEARCHING) {
             if (Client.isKeyDown('shift')) return;
-            if (currentPlotPests > 0) return this.startParticleSearch();
+            return this.startParticleSearch();
         }
 
         if (pests.length) {
@@ -105,7 +104,12 @@ class PestKiller {
     }
 
     findNewPlot() {
-        const plot = TabListUtils.readPests().infestedPlots.find((candidate) => !this.visitedPlots.has(candidate));
+        const { infestedPlots } = TabListUtils.readPests();
+        let plot = infestedPlots.find((candidate) => !this.visitedPlots.has(candidate));
+        if (!plot && infestedPlots.length) {
+            this.visitedPlots.clear();
+            plot = infestedPlots[0];
+        }
         if (!plot) return;
         this.currentPlot = plot;
         this.teleportedToPlot = false;
@@ -218,19 +222,19 @@ class PestKiller {
     }
 
     finishParticleCapture() {
-        if (!this.lastParticle) return this.completeCurrentPlot();
+        if (!this.lastParticle) return (this.state = STATES.SEARCHING);
 
         const dx = this.lastParticle.x - this.firstParticle.x;
         const dy = this.lastParticle.y - this.firstParticle.y;
         const dz = this.lastParticle.z - this.firstParticle.z;
         const length = Math.hypot(dx, dy, dz);
-        if (!length) return this.completeCurrentPlot();
+        if (!length) return (this.state = STATES.SEARCHING);
 
         const x = this.lastParticle.x + (dx / length) * 40;
         const z = this.lastParticle.z + (dz / length) * 40;
         this.state = STATES.PATHING_PARTICLES;
-        this.startPath(this.verticalGoals(x, z), (success) => {
-            this.state = STATES.PATHING_PESTS;
+        this.startPath(this.verticalGoals(x, z), () => {
+            this.state = STATES.SEARCHING;
         });
     }
 
