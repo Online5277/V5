@@ -73,6 +73,7 @@ class PestKiller {
         }
 
         if (!pests.length) {
+            if (Client.isKeyDown('shift')) return;
             if (currentPlotPests > 0) return this.startParticleSearch();
         }
 
@@ -91,6 +92,7 @@ class PestKiller {
                 return false;
             case STATES.PATHING_PESTS:
                 this.stopPath();
+                if (Client.isKeyDown('shift')) return;
                 return this.startParticleSearch();
             case STATES.PATHING_PARTICLES:
                 return false;
@@ -206,9 +208,11 @@ class PestKiller {
     onParticle(packet) {
         if (!this.running || this.state !== STATES.CAPTURING_PARTICLES) return;
         const particle = packet.getParticle?.();
-        if ((particle?.getType?.() ?? particle) !== ANGRY_VILLAGER) return;
-
+        const type = particle?.getType?.() ?? particle;
         const position = { x: packet.getX(), y: packet.getY(), z: packet.getZ() };
+        const isAngryVillager = type === ANGRY_VILLAGER;
+        if (!isAngryVillager) return;
+
         if (!this.firstParticle) this.firstParticle = position;
         else this.lastParticle = position;
     }
@@ -222,12 +226,11 @@ class PestKiller {
         const length = Math.hypot(dx, dy, dz);
         if (!length) return this.completeCurrentPlot();
 
-        const x = this.lastParticle.x + (dx / length) * 15;
-        const z = this.lastParticle.z + (dz / length) * 15;
+        const x = this.lastParticle.x + (dx / length) * 40;
+        const z = this.lastParticle.z + (dz / length) * 40;
         this.state = STATES.PATHING_PARTICLES;
         this.startPath(this.verticalGoals(x, z), (success) => {
-            this.state = STATES.SEARCHING;
-            if (!success) this.completeCurrentPlot();
+            this.state = PATHING_PESTS;
         });
     }
 
