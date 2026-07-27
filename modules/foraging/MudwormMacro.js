@@ -75,6 +75,7 @@ class MudwormMacro extends ModuleBase {
             this.message('&aResumed.');
         }
         const mana = Utils.getCurrentMana();
+        this.message(`Current Mana = ${mana}. report this to rdbt`);
         if (mana !== null && mana < 100) return this.rewarp();
         if (this.currentTarget && Date.now() - this.targetStartedAt >= TARGET_TIMEOUT_MS) return this.blacklistCurrentTarget();
         if (this.busy || EtherwarpPathfinder.isPathing()) return;
