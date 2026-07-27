@@ -141,6 +141,7 @@ new CycleMacro(
             ['Right', 'sd'],
         ],
         laneChangeKey: 's',
+        adjustablePitch: true,
     }
 );
 
