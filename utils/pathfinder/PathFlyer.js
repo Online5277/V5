@@ -168,7 +168,7 @@ class SimulationPathFlyer {
         this.turnAngle = this.angleBetween({ x: near.x - projection.point.x, z: near.z - projection.point.z }, { x: far.x - near.x, z: far.z - near.z });
         this.currentPathCurvature = (this.turnAngle * Math.PI) / 180;
 
-        const angles = MathUtils.calculateAbsoluteAngles({ x: lookTarget.x, y: lookTarget.y + this.EYE_HEIGHT, z: lookTarget.z });
+        const angles = MathUtils.calculateAbsoluteAngles({ x: lookTarget.x, y: lookTarget.y + this.EYE_HEIGHT - 1, z: lookTarget.z });
         this.targetYaw = angles.yaw;
         this.targetPitch = angles.pitch;
     }

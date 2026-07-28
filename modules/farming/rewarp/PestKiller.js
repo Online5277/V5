@@ -66,13 +66,11 @@ class PestKiller {
 
         const pests = getLoadedPests();
         const nearbyPest = pests.find((pest) => this.distanceSq(pest) <= PEST_RANGE_SQ);
-        const killablePest = nearbyPest && this.isPestKillable(nearbyPest);
         if (this.state === STATES.KILLING) {
-            if (!nearbyPest || (!killablePest && !Rotations.active)) {
+            if (!nearbyPest) {
                 this.stopKilling();
                 return false;
             }
-            return this.kill(nearbyPest);
         }
 
         if (!pests.length && this.state === STATES.SEARCHING) {
@@ -170,7 +168,7 @@ class PestKiller {
         this.state = STATES.KILLING;
         Client.unpressKeys();
         if (!farmingSettings.selectVacuum()) return false;
-        Rotations.lookAtVector(pest, { precision: 5 });
+        if (MathUtils.angleToPlayer(pest).distance >= PEST_ANGLE) Rotations.lookAtVector(pest, { precision: 5 });
         Client.setKey('rightclick', true);
         return false;
     }
@@ -264,10 +262,6 @@ class PestKiller {
         const dy = entity.getY() - Player.getY();
         const dz = entity.getZ() - Player.getZ();
         return dx * dx + dy * dy + dz * dz;
-    }
-
-    isPestKillable(pest) {
-        return this.distanceSq(pest) <= PEST_RANGE_SQ && MathUtils.angleToPlayer(pest).distance <= PEST_ANGLE;
     }
 
     id(entity) {
