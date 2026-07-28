@@ -57,9 +57,12 @@ class SimulationPathFlyer {
 
         this.releaseKeys();
         this.path = path;
+        this.boxPositions = path;
         this.totalDistance = path[path.length - 1].distance;
         this.segment = 0;
         this.progressDistance = 0;
+        this.currentPathPosition = 0;
+        this.currentPathCurvature = 0;
         this.bestProgressDistance = 0;
         this.lastProgressAt = Date.now();
         this.lastAction = null;
@@ -140,6 +143,7 @@ class SimulationPathFlyer {
         const projection = this.project(position, this.segment);
         this.segment = projection.segment;
         this.progressDistance = Math.max(this.progressDistance, projection.distance);
+        this.currentPathPosition = this.pathPositionAtDistance(this.progressDistance);
 
         if (this.progressDistance > this.bestProgressDistance + 0.4) {
             this.bestProgressDistance = this.progressDistance;
@@ -162,6 +166,7 @@ class SimulationPathFlyer {
         const near = this.pointAtDistance(Math.min(this.totalDistance, this.progressDistance + 1));
         const far = this.pointAtDistance(Math.min(this.totalDistance, this.progressDistance + 7));
         this.turnAngle = this.angleBetween({ x: near.x - projection.point.x, z: near.z - projection.point.z }, { x: far.x - near.x, z: far.z - near.z });
+        this.currentPathCurvature = (this.turnAngle * Math.PI) / 180;
 
         const angles = MathUtils.calculateAbsoluteAngles({ x: lookTarget.x, y: lookTarget.y + this.EYE_HEIGHT, z: lookTarget.z });
         this.targetYaw = angles.yaw;
@@ -322,6 +327,31 @@ class SimulationPathFlyer {
         return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t, distance: clamped, segment };
     }
 
+    pathPositionAtDistance(distance) {
+        const point = this.pointAtDistance(distance);
+        const a = this.path[point.segment];
+        const b = this.path[Math.min(this.path.length - 1, point.segment + 1)];
+        const length = b.distance - a.distance;
+        return point.segment + (length ? (point.distance - a.distance) / length : 0);
+    }
+
+    getInterpolatedPoint(pathPosition) {
+        const position = Math.max(0, Math.min(this.path.length - 1, pathPosition));
+        const index = Math.floor(position);
+        const a = this.path[index];
+        const b = this.path[Math.min(this.path.length - 1, index + 1)];
+        const fraction = position - index;
+        return fraction ? { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction, z: a.z + (b.z - a.z) * fraction } : a;
+    }
+
+    onTeleportTriggered(targetPathPosition) {
+        const target = Math.max(0, targetPathPosition - 2);
+        const a = this.path[Math.floor(target)];
+        const b = this.path[Math.min(this.path.length - 1, Math.floor(target) + 1)];
+        const distance = a.distance + (b.distance - a.distance) * (target - Math.floor(target));
+        this.progressDistance = Math.max(this.progressDistance, distance);
+    }
+
     pointWithHorizontalLead(position, distance, minimumLead) {
         const target = this.pointAtDistance(distance);
         if (Math.hypot(target.x - position.x, target.z - position.z) >= minimumLead) return target;
@@ -437,9 +467,12 @@ class SimulationPathFlyer {
     reset() {
         if (this.isActive) this.releaseKeys();
         this.path = [];
+        this.boxPositions = this.path;
         this.totalDistance = 0;
         this.segment = 0;
         this.progressDistance = 0;
+        this.currentPathPosition = 0;
+        this.currentPathCurvature = 0;
         this.bestProgressDistance = 0;
         this.remainingDistance = 0;
         this.lastProgressAt = 0;

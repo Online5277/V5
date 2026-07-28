@@ -279,6 +279,8 @@ class Finder {
                 }
 
                 if (this.flyStarted && this.flyStartDelayTicks === 0) {
+                    Aote.onPathTick(PathFlyer, true);
+
                     if (this.checkIfReachedDestination()) {
                         this.finishSuccess();
                         return;
@@ -868,7 +870,7 @@ class Finder {
         PathFlyer.reset();
         Spline.clearCache();
         Jump.reset();
-        Aote.stop(true);
+        Aote.stop(clearFlags);
         Movement.stopMovement();
         if (clearFlags) {
             Recovery.stop();

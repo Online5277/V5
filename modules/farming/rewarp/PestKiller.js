@@ -4,10 +4,12 @@ import { Rotations } from '../../../utils/player/Rotations';
 import { TabListUtils } from '../../../utils/TabListUtils';
 import { getLoadedPests } from '../../visuals/PestESP';
 import { farmingSettings } from '../FarmingSettings';
+import { MathUtils } from '../../../utils/Math';
 import { Utils } from '../../../utils/Utils';
 
 const ANGRY_VILLAGER = net.minecraft.core.particles.ParticleTypes.ANGRY_VILLAGER;
-const PEST_RANGE_SQ = 10 ** 2;
+const PEST_RANGE_SQ = 12.5 ** 2;
+const PEST_ANGLE = 45;
 const PARTICLE_SEARCH_MS = 1_000;
 const PLOT_TIMEOUT_MS = 30_000;
 const STATES = {
@@ -33,8 +35,6 @@ class PestKiller {
         this.teleportedToPlot = false;
         this.visitedPlots = new Set();
         this.pathToken = 0;
-        this.targetId = null;
-        this.trackedTargetId = null;
         farmingSettings.originalSlot = Player.getHeldItemIndex();
     }
 
@@ -65,10 +65,14 @@ class PestKiller {
         }
 
         const pests = getLoadedPests();
+        const nearbyPest = pests.find((pest) => this.distanceSq(pest) <= PEST_RANGE_SQ);
+        const killablePest = nearbyPest && this.isPestKillable(nearbyPest);
         if (this.state === STATES.KILLING) {
-            const target = pests.find((pest) => this.id(pest) === this.targetId);
-            if (target && this.distanceSq(target) <= PEST_RANGE_SQ) return this.kill(target);
-            this.stopKilling();
+            if (!nearbyPest || (!killablePest && !Rotations.active)) {
+                this.stopKilling();
+                return false;
+            }
+            return this.kill(nearbyPest);
         }
 
         if (!pests.length && this.state === STATES.SEARCHING) {
@@ -78,9 +82,7 @@ class PestKiller {
 
         if (pests.length) {
             this.particleSearchGrace = Date.now() + 1000;
-            for (const pest of pests) {
-                if (this.distanceSq(pest) <= PEST_RANGE_SQ) return this.kill(pest);
-            }
+            if (nearbyPest) return this.kill(nearbyPest);
             if (this.state !== STATES.PATHING_PESTS || this.hasPestsChanged(pests)) this.pathToPests(pests);
             return false;
         }
@@ -166,13 +168,9 @@ class PestKiller {
     kill(pest) {
         this.stopPath();
         this.state = STATES.KILLING;
-        this.targetId = this.id(pest);
         Client.unpressKeys();
         if (!farmingSettings.selectVacuum()) return false;
-        if (this.trackedTargetId !== this.targetId) {
-            Rotations.lookAtVector(pest, { precision: 15 });
-            this.trackedTargetId = this.targetId;
-        }
+        Rotations.lookAtVector(pest, { precision: 5 });
         Client.setKey('rightclick', true);
         return false;
     }
@@ -181,8 +179,6 @@ class PestKiller {
         if (this.state !== STATES.KILLING) return;
         Rotations.stop();
         Client.unpressKeys();
-        this.targetId = null;
-        this.trackedTargetId = null;
         this.state = STATES.SEARCHING;
     }
 
@@ -241,7 +237,7 @@ class PestKiller {
 
     startPath(goals, onComplete) {
         const token = ++this.pathToken;
-        Pathfinder.resetPath();
+        Pathfinder.resetPath(false);
         if (!goals.length) return onComplete(false);
         Pathfinder.findPath(
             goals,
@@ -268,6 +264,10 @@ class PestKiller {
         const dy = entity.getY() - Player.getY();
         const dz = entity.getZ() - Player.getZ();
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    isPestKillable(pest) {
+        return this.distanceSq(pest) <= PEST_RANGE_SQ && MathUtils.angleToPlayer(pest).distance <= PEST_ANGLE;
     }
 
     id(entity) {

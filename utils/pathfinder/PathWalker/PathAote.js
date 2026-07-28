@@ -22,7 +22,7 @@ class PathAote {
         this.lastSkipAt = 0;
         this.lastMissingItemAt = 0;
         this.AOTE_RANGE = 14;
-        this.AOTE_MIN_GAIN = this.AOTE_RANGE - 2;
+        this.AOTE_MIN_GAIN = 10;
         this.AOTE_STRAIGHTNESS_THRESHOLD = 25;
         this.MINIMUM_MANA_TO_USE = 100;
         this.MINIMUM_TOTAL_PATH_LENGTH = 40;
@@ -30,14 +30,13 @@ class PathAote {
         this.MIN_GAIN_RELAX_IN_FLUID_DISTANCE = 4;
     }
 
-    onPathTick(rotations) {
-        if (!PathConfig.WALKER_AOTE_ENABLED) return;
+    onPathTick(rotations, flying = false) {
         if (!rotations || !rotations.boxPositions || !rotations.rotationActive || rotations.complete) return;
 
         const player = Player.getPlayer();
         if (!player) return;
 
-        if (this.getDistanceToFinalPoint(rotations) <= this.FINAL_POINT_NO_AOTE_RADIUS) {
+        if (!flying && this.getDistanceToFinalPoint(rotations) <= this.FINAL_POINT_NO_AOTE_RADIUS) {
             this.restoreOriginalSlot();
             return this.debug('near final point');
         }
@@ -48,8 +47,7 @@ class PathAote {
             return;
         }
 
-        const totalPathLength = this.getTotalPathLength(rotations);
-        if (totalPathLength < this.MINIMUM_TOTAL_PATH_LENGTH) {
+        if (!flying && this.getTotalPathLength(rotations) < this.MINIMUM_TOTAL_PATH_LENGTH) {
             return this.debug(`total path too short (<${this.MINIMUM_TOTAL_PATH_LENGTH})`);
         }
 
@@ -66,7 +64,6 @@ class PathAote {
         if (!this.ensureAoteHeld(slot)) return;
 
         const playerInFluid = this.isPlayerInFluid();
-        const range = this.AOTE_RANGE;
         let minGain = this.AOTE_MIN_GAIN;
         let straightness = this.AOTE_STRAIGHTNESS_THRESHOLD;
         if (playerInFluid) {
@@ -78,11 +75,11 @@ class PathAote {
             return this.debug('recovery');
         }
 
-        if (Math.abs(Player.getMotionY()) > 0.25 && !playerInFluid) {
+        if (!flying && Math.abs(Player.getMotionY()) > 0.25 && !playerInFluid) {
             return this.debug('vertical motion');
         }
 
-        const candidate = this.getTargetAlongPath(rotations, range);
+        const candidate = this.getTargetAlongPath(rotations, minGain);
         if (!candidate || candidate.advanceDistance < minGain) {
             return this.debug('gain too small');
         }
@@ -95,7 +92,7 @@ class PathAote {
             return this.debug('not facing path');
         }
 
-        if (this.estimateInstantTransmissionDistance(range) < minGain) {
+        if (this.estimateInstantTransmissionDistance(minGain) < minGain) {
             return this.debug('teleport too short');
         }
 
@@ -104,7 +101,7 @@ class PathAote {
         Client.rightClick();
         Jump.suppressJump(5);
         rotations.onTeleportTriggered(candidate.targetPathPosition);
-        this.cooldownTicks = PathConfig.WALKER_AOTE_COOLDOWN_TICKS;
+        this.cooldownTicks = 10;
         this.lastUsedPathPosition = rotations.currentPathPosition;
 
         if (PathConfig.PATHFINDING_DEBUG) {
@@ -188,7 +185,7 @@ class PathAote {
         const mana = Utils.getCurrentMana();
         if (mana === null) {
             this.debug('mana unavailable');
-            return false;
+            //return false;
         }
 
         if (mana < this.MINIMUM_MANA_TO_USE) {
