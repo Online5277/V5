@@ -81,7 +81,7 @@ class PestKiller {
             for (const pest of pests) {
                 if (this.distanceSq(pest) <= PEST_RANGE_SQ) return this.kill(pest);
             }
-            if (this.state !== STATES.PATHING_PESTS || this.hasPestMoved(pests)) this.pathToPests(pests);
+            if (this.state !== STATES.PATHING_PESTS || this.hasPestsChanged(pests)) this.pathToPests(pests);
             return false;
         }
 
@@ -151,7 +151,8 @@ class PestKiller {
         });
     }
 
-    hasPestMoved(pests) {
+    hasPestsChanged(pests) {
+        if (pests.length !== this.pathPestPositions?.size) return true;
         return pests.some((pest) => {
             const start = this.pathPestPositions?.get(this.id(pest));
             if (!start) return true;
