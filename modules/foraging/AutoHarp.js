@@ -44,7 +44,7 @@ class AutoHarp extends ModuleBase {
             });
         });
 
-        this.addSlider('Delay', 0, 10, 3, (v) => (this.DELAY = v));
+        this.addSlider('Delay (ms)', 0, 500, 150, (v) => (this.DELAY = Math.round(v / 50)));
     }
 
     onDisable() {
