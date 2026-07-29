@@ -139,7 +139,7 @@ GuiRectangles.RightPanel = {
         return 4;
     },
     get width() {
-        return GuiState.getGuiWidth() - GuiRectangles.LeftPanel.width - PADDING;
+        return Math.min(440, GuiState.getGuiWidth() - GuiRectangles.LeftPanel.width - PADDING);
     },
     get height() {
         return GuiState.getGuiHeight() - this.y;
