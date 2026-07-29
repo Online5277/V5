@@ -2,6 +2,7 @@
 import './mining/CommissionMacro';
 import './mining/ExcavatorMacro';
 import './mining/GlaciteCommissionMacro';
+import './mining/JasperDrillExploit';
 import './mining/LobbyHopper';
 import './foraging/MudwormMacro';
 import './foraging/LushLilacEtherwarpNuker';

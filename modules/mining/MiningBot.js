@@ -3,7 +3,6 @@ import { MathUtils } from '../../utils/Math';
 import { MiningUtils } from '../../utils/MiningUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { NukerUtils } from '../../utils/NukerUtils';
-import { ServerboundPlayerActionPacket } from '../../utils/Packets';
 import { Raytrace } from '../../utils/Raytrace';
 import { manager } from '../../utils/SkyblockEvents';
 import { Utils } from '../../utils/Utils';
@@ -229,12 +228,6 @@ class Bot extends ModuleBase {
     }
 
     initEventHandlers() {
-        this.exploit = register('packetSent', (packet, event) => {
-            if (packet?.getAction()?.toString() === 'ABORT_DESTROY_BLOCK') cancel(event);
-        })
-            .setFilteredClass(ServerboundPlayerActionPacket)
-            .unregister();
-
         this.debug = register('postRenderWorld', () => this.renderDebug()).unregister();
         this.normalRender = register('postRenderWorld', () => this.renderNormal()).unregister();
 
@@ -316,13 +309,6 @@ class Bot extends ModuleBase {
             'Adds extra ticks to glide delay on top of TPS compensation. (Tick Gliding)'
         );
         additionalLagCompensation.visible = this.TICKGLIDE;
-        this.addToggle(
-            'Jasper Drill Exploit',
-            (value) => {
-                value ? this.exploit.register() : this.exploit.unregister();
-            },
-            'Left click a gemstone with a Gemstone Drill to activate exploit.'
-        );
         this.addToggle(
             'Prioritze Titanium',
             (value) => {
