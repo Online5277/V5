@@ -477,7 +477,7 @@ class OverlayUtils {
     }
 
     drawAccentGlow(x, y, width, height, radius, progress, accentOverride = null) {
-        const accentColor = accentOverride || THEME.OV_ACCENT;
+        const accentColor = accentOverride || THEME.ACCENT;
         const glowIntensity = 0.12;
         for (let i = 2; i >= 0; i--) {
             const expand = i * 2;
@@ -520,7 +520,7 @@ class OverlayUtils {
         const scale = settings.scale;
         const { boxPadding, minBoxHeight, fontSize, argFontSize } = scaleProps;
         const accentColor = THEME.ACCENT;
-        const borderColor = colorWithAlpha(THEME.OV_ACCENT, 0.35 * progress);
+        const borderColor = colorWithAlpha(THEME.BORDER, progress);
         const showUptime = !isScheduler;
 
         const headerHeight = 20 * scale;
@@ -600,7 +600,7 @@ class OverlayUtils {
 
         const currentHeight = id.height * progress;
         const radius = CORNER_RADIUS * scale;
-        const bgColor = colorWithAlpha(THEME.OV_WINDOW, 0.95 * progress);
+        const bgColor = colorWithAlpha(THEME.BG_COMPONENT, progress);
 
         drawRoundedRectangleWithBorder({
             x: x,
@@ -623,7 +623,7 @@ class OverlayUtils {
                 const titleAlign = 16;
 
                 drawText(id.name, titleX + 1, titleY + 1, fontSize, colorWithAlpha(0xff000000, 0.35 * contentAlpha), titleAlign);
-                drawText(id.name, titleX, titleY, fontSize, colorWithAlpha(0xffffff, contentAlpha), titleAlign);
+                drawText(id.name, titleX, titleY, fontSize, colorWithAlpha(THEME.TEXT, contentAlpha), titleAlign);
 
                 let contentY = titleY + 10 * scale;
 
@@ -639,10 +639,10 @@ class OverlayUtils {
                     }
 
                     section.lines.forEach((line) => {
-                        drawText(line.label, leftAlignX, contentY, argFontSize, colorWithAlpha(0xff8a94a0, contentAlpha), 17);
+                        drawText(line.label, leftAlignX, contentY, argFontSize, colorWithAlpha(THEME.TEXT_MUTED, contentAlpha), 17);
 
                         const valueX = x + id.width - basePadding;
-                        const valueColor = line.isUptime ? colorWithAlpha(accentColor, contentAlpha) : colorWithAlpha(0xffffff, 0.92 * contentAlpha);
+                        const valueColor = line.isUptime ? colorWithAlpha(accentColor, contentAlpha) : colorWithAlpha(THEME.TEXT, contentAlpha);
 
                         drawText(String(line.value), valueX, contentY, argFontSize, valueColor, 20);
 
@@ -706,7 +706,7 @@ class OverlayUtils {
 
             const text = 'Drag overlays to reposition. Scroll over module/scheduler/HUD previews to resize.';
             const textWidth = getTextWidth(text, FontSizes.MEDIUM);
-            drawText(text, (sw - textWidth) / 2, 30, FontSizes.MEDIUM, 0xffffffff, 16);
+            drawText(text, (sw - textWidth) / 2, 30, FontSizes.MEDIUM, THEME.TEXT, 16);
         } catch (e) {
             console.error('V5 Caught error' + e + e.stack);
         } finally {
@@ -828,8 +828,8 @@ class OverlayUtils {
         this.hudSettings.stats.x = clamped.x;
         this.hudSettings.stats.y = clamped.y;
 
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.92);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.35);
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
         drawRoundedRectangleWithBorder({
             x: clamped.x,
             y: clamped.y,
@@ -841,8 +841,8 @@ class OverlayUtils {
             borderColor: border,
         });
 
-        const labelColor = colorWithAlpha(0xffffff, 0.7);
-        const separatorColor = colorWithAlpha(0xffffff, 0.4);
+        const labelColor = THEME.TEXT_MUTED;
+        const separatorColor = colorWithAlpha(THEME.TEXT_MUTED, 0.6);
         const centerY = clamped.y + height / 2;
         let x = clamped.x + pad;
 
@@ -878,8 +878,8 @@ class OverlayUtils {
         this.hudSettings.inventory.x = clamped.x;
         this.hudSettings.inventory.y = clamped.y;
 
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.9);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.25);
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
         drawRoundedRectangleWithBorder({
             x: clamped.x,
             y: clamped.y,
@@ -923,8 +923,8 @@ class OverlayUtils {
         this.musicSettings.x = clamped.x;
         this.musicSettings.y = clamped.y;
 
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.92);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.35);
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
 
         drawRoundedRectangleWithBorder({
             x: clamped.x,
@@ -945,14 +945,14 @@ class OverlayUtils {
             width: imageSize,
             height: imageSize,
             radius: CORNER_RADIUS * 0.5 * s,
-            color: colorWithAlpha(0xff000000, 0.3),
+            color: THEME.BG_INSET,
             borderWidth: 0,
             borderColor: 0,
         });
 
         const qWidth = getTextWidth('...', titleFontSize);
-        drawText('...', imgX + imageSize / 2 - qWidth / 2, imgY + imageSize / 2 - titleFontSize / 2.5, titleFontSize, 0xaaaaaaff, 16);
-        drawText(songName, clamped.x + padding, clamped.y + padding + titleFontSize, titleFontSize, 0xaaaaaaff, 16);
+        drawText('...', imgX + imageSize / 2 - qWidth / 2, imgY + imageSize / 2 - titleFontSize / 2.5, titleFontSize, THEME.TEXT_MUTED, 16);
+        drawText(songName, clamped.x + padding, clamped.y + padding + titleFontSize, titleFontSize, THEME.TEXT_MUTED, 16);
 
         const curTimeWidth = getTextWidth(timeCur, timerFontSize);
         const maxTimeWidth = getTextWidth(timeMax, timerFontSize);
@@ -963,8 +963,8 @@ class OverlayUtils {
         const barY = clamped.y + height - padding - barHeight * 0.8;
         const timerY = barY + barHeight / 2 - timerFontSize / 2.5;
 
-        drawText(timeCur, clamped.x + padding, timerY + timerFontSize / 2.5, timerFontSize, 0x888888ff, 16);
-        drawText(timeMax, clamped.x + width - padding - maxTimeWidth, timerY + timerFontSize / 2.5, timerFontSize, 0x888888ff, 16);
+        drawText(timeCur, clamped.x + padding, timerY + timerFontSize / 2.5, timerFontSize, THEME.TEXT_MUTED, 16);
+        drawText(timeMax, clamped.x + width - padding - maxTimeWidth, timerY + timerFontSize / 2.5, timerFontSize, THEME.TEXT_MUTED, 16);
 
         drawRoundedRectangleWithBorder({
             x: barStartX,
@@ -972,7 +972,7 @@ class OverlayUtils {
             width: barWidth,
             height: barHeight,
             radius: barHeight / 2,
-            color: colorWithAlpha(0xffffff, 0.15),
+            color: THEME.BG_INSET,
             borderWidth: 0,
             borderColor: 0,
         });
@@ -985,7 +985,7 @@ class OverlayUtils {
         const ping = ServerInfo.getPing();
         const tps = ServerInfo.getTPS();
         return [
-            { label: 'FPS', value: String(fps), color: 0xffffffff },
+            { label: 'FPS', value: String(fps), color: THEME.TEXT },
             { label: 'Ping', value: `${ping}ms`, color: (0xff000000 | ServerInfo.getPingColor(ping)) >>> 0 },
             { label: 'TPS', value: tps.toFixed(2), color: (0xff000000 | ServerInfo.getTpsColor(tps)) >>> 0 },
         ];

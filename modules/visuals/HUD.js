@@ -119,7 +119,7 @@ class HUD extends ModuleBase {
         const tps = ServerInfo.getTPS();
 
         return [
-            { label: 'FPS', value: String(fps), color: 0xffffffff },
+            { label: 'FPS', value: String(fps), color: THEME.TEXT },
             { label: 'Ping', value: `${ping}ms`, color: (0xff000000 | ServerInfo.getPingColor(ping)) >>> 0 },
             { label: 'TPS', value: tps.toFixed(2), color: (0xff000000 | ServerInfo.getTpsColor(tps)) >>> 0 },
         ];
@@ -196,8 +196,8 @@ class HUD extends ModuleBase {
         const pad = 6 * s;
         const fontSize = FontSizes.MEDIUM * 1.25 * s;
 
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.92);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.35);
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
 
         drawRoundedRectangleWithBorder({
             x: o.x,
@@ -210,8 +210,8 @@ class HUD extends ModuleBase {
             borderColor: border,
         });
 
-        const labelColor = colorWithAlpha(0xffffff, 0.7);
-        const separatorColor = colorWithAlpha(0xffffff, 0.4);
+        const labelColor = THEME.TEXT_MUTED;
+        const separatorColor = colorWithAlpha(THEME.TEXT_MUTED, 0.6);
         const lines = this.getStatsLines();
 
         const centerY = o.y + o.height / 2;
@@ -243,8 +243,8 @@ class HUD extends ModuleBase {
         const o = this.inventory;
         const s = o.scale;
 
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.9);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.25);
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
 
         drawRoundedRectangleWithBorder({
             x: o.x,

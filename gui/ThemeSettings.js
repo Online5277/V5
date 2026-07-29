@@ -14,9 +14,6 @@ const DEFAULT_THEME = {
     HOVER: new Color(0.15, 0.12, 0.115, 1),
     ACCENT: new Color(0.9, 0.77, 0.73, 1),
     BORDER: new Color(0.3, 0.26, 0.24, 1),
-    OV_WINDOW: new Color(0.04, 0.04, 0.04, 0.75),
-    OV_BORDER: new Color(0.4, 0.7, 1.0, 0.0),
-    OV_ACCENT: new Color(0.4, 0.7, 1.0, 1),
     TEXT: 0xffeeeeee,
     TEXT_MUTED: 0xffaaaaaa,
 };
@@ -115,39 +112,6 @@ const initThemeSettings = () => {
         'Color for hovered items. Also ends up affecting secondary surfaces (separators and stuff).',
         'Interface',
         DEFAULT_THEME.HOVER
-    );
-
-    addThemePicker(
-        'Overlay Main Color',
-        THEME.OV_WINDOW,
-        (c) => {
-            THEME.OV_WINDOW = c;
-        },
-        'Main  color for the overlay.',
-        'Overlay',
-        DEFAULT_THEME.OV_WINDOW
-    );
-
-    addThemePicker(
-        'Overlay Border Color',
-        THEME.OV_BORDER,
-        (c) => {
-            THEME.OV_BORDER = c;
-        },
-        'Border color for the overlay.',
-        'Overlay',
-        DEFAULT_THEME.OV_BORDER
-    );
-
-    addThemePicker(
-        'Overlay Accent Color',
-        THEME.OV_ACCENT,
-        (c) => {
-            THEME.OV_ACCENT = c;
-        },
-        'Accent color for the overlay.',
-        'Overlay',
-        DEFAULT_THEME.OV_ACCENT
     );
 
     addThemePicker('Primary Text', THEME.TEXT, (c) => (THEME.TEXT = c), 'Main text color.', 'Text', DEFAULT_THEME.TEXT);

@@ -57,10 +57,6 @@ export const THEME = {
     BG_ELEVATED: new Color(0.12, 0.1, 0.095, 1),
     BG_INSET: new Color(0.24, 0.2, 0.19, 1),
 
-    OV_WINDOW: new Color(0.04, 0.04, 0.04, 0.75),
-    OV_BORDER: new Color(0.4, 0.7, 1.0, 0.0),
-    OV_ACCENT: new Color(0.4, 0.7, 1.0, 1),
-
     HOVER: new Color(0.15, 0.12, 0.115, 1),
     ACCENT: new Color(0.9, 0.77, 0.73, 1),
     ACCENT_GLOW: new Color(0.9, 0.77, 0.73, 0.2),

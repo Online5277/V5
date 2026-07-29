@@ -1,15 +1,5 @@
 import requestV2 from 'requestV2';
-import {
-    BORDER_WIDTH,
-    colorWithAlpha,
-    CORNER_RADIUS,
-    drawImageFromURL,
-    drawRoundedRectangleWithBorder,
-    drawText,
-    FontSizes,
-    getTextWidth,
-    THEME,
-} from '../../gui/Utils';
+import { BORDER_WIDTH, CORNER_RADIUS, drawImageFromURL, drawRoundedRectangleWithBorder, drawText, FontSizes, getTextWidth, THEME } from '../../gui/Utils';
 import { File, InputStreamReader, isWindows, ProcessBuilder, Runtime, Scanner, globalAssetsDir } from '../../utils/Constants';
 import { Chat } from '../../utils/Chat';
 import { streamDownloadToFile } from '../../utils/FileUtils';
@@ -187,10 +177,10 @@ class Music extends ModuleBase {
         const overflowRight = Math.max(0, this.x + this.dynamicWidth - sw);
         const overlayX = Math.max(0, this.x - overflowRight);
 
-        const titleColor = isSkeleton ? 0xaaaaaaff : 0xffffffff;
-        const timeColor = isSkeleton ? 0x888888ff : 0xccffffff;
-        const bg = colorWithAlpha(THEME.OV_WINDOW, 0.92);
-        const border = colorWithAlpha(THEME.OV_ACCENT, 0.35);
+        const titleColor = isSkeleton ? THEME.TEXT_MUTED : THEME.TEXT;
+        const timeColor = THEME.TEXT_MUTED;
+        const bg = THEME.BG_COMPONENT;
+        const border = THEME.BORDER;
 
         try {
             NVG.beginFrame(sw, sh);
@@ -218,7 +208,7 @@ class Music extends ModuleBase {
                     width: imageSize,
                     height: imageSize,
                     radius: CORNER_RADIUS * 0.5 * s,
-                    color: colorWithAlpha(0xff000000, 0.3),
+                    color: THEME.BG_INSET,
                     borderWidth: 0,
                     borderColor: 0,
                 });
@@ -226,7 +216,7 @@ class Music extends ModuleBase {
                 const qText = isSkeleton ? '...' : '?';
                 const qSize = titleFontSize;
                 const qWidth = getTextWidth(qText, qSize);
-                drawText(qText, imgX + imageSize / 2 - qWidth / 2, imgY + imageSize / 2 - qSize / 2.5, qSize, 0xaaaaaaff, 16);
+                drawText(qText, imgX + imageSize / 2 - qWidth / 2, imgY + imageSize / 2 - qSize / 2.5, qSize, THEME.TEXT_MUTED, 16);
             }
 
             drawText(songName, overlayX + padding, this.y + padding + titleFontSize, titleFontSize, titleColor, 16);
@@ -251,7 +241,7 @@ class Music extends ModuleBase {
                 width: barWidth,
                 height: barHeight,
                 radius: barHeight / 2,
-                color: colorWithAlpha(0xffffff, 0.15),
+                color: THEME.BG_INSET,
                 borderWidth: 0,
                 borderColor: 0,
             });
@@ -263,7 +253,7 @@ class Music extends ModuleBase {
                     width: Math.max(0, barWidth * progress),
                     height: barHeight,
                     radius: barHeight / 2,
-                    color: colorWithAlpha(0xffffff, 1.0),
+                    color: THEME.ACCENT,
                     borderWidth: 0,
                     borderColor: 0,
                 });
