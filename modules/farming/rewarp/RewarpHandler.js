@@ -10,6 +10,7 @@ import { farmingDelays } from '../FarmingDelays';
 
 const PHASES = {
     BARN: 'Warping to barn',
+    WAITING_FOR_BARN: 'Waiting for barn',
     DECIDING: 'Determining',
     RUNNING: 'Running task',
     REWARP: 'Rewarping',
@@ -19,6 +20,12 @@ const REWARP_RETRY_MS = 10_000;
 const MAX_REWARP_ATTEMPTS = 3;
 
 class RewarpHandler {
+    constructor() {
+        register('chat', (event) => {
+            if (this.phase === PHASES.WAITING_FOR_BARN && event.message?.getUnformattedText?.() === 'Teleported you to The Barn!') this.phase = PHASES.DECIDING;
+        });
+    }
+
     start(macro, rewarpStartPoint, runPestKiller = false) {
         this.macro = macro;
         this.rewarpStartPoint = rewarpStartPoint;
@@ -52,8 +59,7 @@ class RewarpHandler {
         if (this.phase === PHASES.BARN) {
             if (this.runVisitor && !loadoutHandler.select(loadoutHandler.visitorSlot)) return;
             ChatLib.command('tptoplot barn');
-            this.phase = PHASES.DECIDING;
-            this.nextActionAt = Date.now() + 2000;
+            this.phase = PHASES.WAITING_FOR_BARN;
             return;
         }
 

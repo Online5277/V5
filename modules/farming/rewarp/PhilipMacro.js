@@ -91,15 +91,17 @@ class PhilipMacro {
         if (Pathfinder.isPathing()) Pathfinder.resetPath();
         Client.unpressKeys();
         this.transition(STATES.APPROACHING);
-        Rotations.lookAtVector({ x: philip.getX(), y: philip.getY() + 1.62, z: philip.getZ() });
-        Client.setKey('w', true);
-        Client.setKey('shift', true);
     }
 
     approach() {
         const philip = this.find();
         if (!philip) return this.retry();
-        if (philip.distanceTo(Player.getX(), Player.getY(), Player.getZ()) > INTERACT_DISTANCE) return;
+        if (philip.distanceTo(Player.getX(), Player.getY(), Player.getZ()) > INTERACT_DISTANCE) {
+            Rotations.lookAtVector({ x: philip.getX(), y: philip.getY() + 1.62, z: philip.getZ() });
+            Client.setKey('w', true);
+            Client.setKey('shift', true);
+            return;
+        }
 
         Client.stopMovement();
         this.transition(STATES.OPENING, 2500);

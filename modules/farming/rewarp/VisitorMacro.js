@@ -108,13 +108,13 @@ class VisitorMacro {
         if (!target) return this.stop();
 
         const entity = this.findVisitor(target);
-        if (!entity) return this.retryBarn();
+        if (!entity) return;
 
         const dx = entity.getX() - Player.getX();
         const dy = entity.getY() - Player.getY();
         const dz = entity.getZ() - Player.getZ();
         const distanceSq = dx * dx + dy * dy + dz * dz;
-        if (distanceSq > 15 ** 2) return this.retryBarn();
+        if (distanceSq > 15 ** 2) return;
         if (distanceSq > INTERACT_DISTANCE ** 2) return this.pathTo(entity);
         if (Rotations.active) return;
 
@@ -141,11 +141,6 @@ class VisitorMacro {
 
     retry(state) {
         this.transition(state, Utils.randomInt(farmingDelays.visitorRetryDelayMin, farmingDelays.visitorRetryDelayMax));
-    }
-
-    retryBarn() {
-        ChatLib.command('tptoplot barn');
-        this.nextActionAt = Date.now() + TELEPORT_RETRY_MS;
     }
 
     findVisitor(target) {
