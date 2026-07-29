@@ -817,8 +817,7 @@ class OreMiner extends ModuleBase {
             return;
         }
 
-        const previousWaypoint =
-            this.loadedWaypoints[(this.waypointIndex - 1 + this.loadedWaypoints.length) % this.loadedWaypoints.length];
+        const previousWaypoint = this.loadedWaypoints[(this.waypointIndex - 1 + this.loadedWaypoints.length) % this.loadedWaypoints.length];
         const intentionalDrop = previousWaypoint?.pos?.y > y;
         const nearEdge = !intentionalDrop && this.hasEdgeAhead(x, y, z);
         Keybind.setKeysForStraightLineCoords(x, y, z, !nearEdge);
