@@ -17,7 +17,7 @@ class LoadoutHandler extends ModuleBase {
         this.pestSpawningSlot = 1;
         this.pestKillingSlot = 1;
         this.visitorSlot = 1;
-        this.pestSpawnSwapCooldown = 0;
+        this.pestSpawnSwapCooldown = 140;
         this.currentSlot = null;
         this.targetSlot = null;
         this.switching = false;
