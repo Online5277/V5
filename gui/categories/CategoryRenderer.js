@@ -39,6 +39,7 @@ const THEME_ICON_PATH = ASSETS_PATH + 'colorpalette.svg';
 const SETTINGS_ICON_PATH = ASSETS_PATH + 'settings.svg';
 const DASHBOARD_ICON_PATH = ASSETS_PATH + 'dashboard.svg';
 const EDIT_ICON_PATH = ASSETS_PATH + 'edit.svg';
+const SCRIPT_VERSION = JSON.parse(FileLib.read('V5', 'metadata.json')).version;
 
 export const getModuleBorderColor = (moduleType) =>
     moduleType === 'developer' ? colorWithAlpha(THEME.NOTIF_WARNING, 0.75) : moduleType === 'user' ? colorWithAlpha(THEME.NOTIF_ERROR, 0.75) : null;
@@ -60,7 +61,7 @@ export const getDiscordPfpRect = () => {
     const pfpSize = 20;
     return {
         x: leftPanel.x + (leftPanel.width - pfpSize) / 2,
-        y: leftPanel.y + leftPanel.height - pfpSize - PADDING,
+        y: leftPanel.y + leftPanel.height - pfpSize - PADDING * 2,
         width: pfpSize,
         height: pfpSize,
     };
@@ -480,6 +481,7 @@ export const drawLeftPanelIcons = (mouseX, mouseY) => {
     if (discordPfpPath) {
         drawCircularImage(discordPfpPath, pfpRect.x, pfpRect.y, pfpRect.width);
     }
+    drawCenteredText(`V${SCRIPT_VERSION}`, pfpRect.x, pfpRect.width, FontSizes.TINY, THEME.TEXT_MUTED, leftPanel.y + leftPanel.height - PADDING);
 };
 
 const drawItemBox = (item, itemX, itemY, itemWidth, itemHeight, mouseX, mouseY, cachedItemLayouts, isLayoutCacheValid, centerText = false) => {
