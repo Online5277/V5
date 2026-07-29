@@ -6,6 +6,7 @@ import { Utils } from '../../../utils/Utils';
 import Pathfinder from '../../../utils/pathfinder/PathFinder';
 import { pestKiller } from './PestKiller';
 import { loadoutHandler } from '../LoadoutHandler';
+import { farmingDelays } from '../FarmingDelays';
 
 const PHASES = {
     BARN: 'Warping to barn',
@@ -34,7 +35,7 @@ class RewarpHandler {
         const hasBarnTasks = this.tasks.length > 0;
         if (runPestKiller) this.tasks.push(pestKiller);
         this.phase = hasBarnTasks ? PHASES.BARN : this.tasks.length ? PHASES.DECIDING : PHASES.REWARP;
-        this.nextActionAt = runPestKiller && !hasBarnTasks ? 0 : Date.now() + Utils.randomInt(rewarpSettings.delayMin, rewarpSettings.delayMax);
+        this.nextActionAt = runPestKiller && !hasBarnTasks ? 0 : Date.now() + Utils.randomInt(farmingDelays.rewarpDelayMin, farmingDelays.rewarpDelayMax);
     }
 
     stop() {
@@ -101,13 +102,13 @@ class RewarpHandler {
             return;
         }
         if (Date.now() < this.nextActionAt) return;
-        if (this.rewarpAttempts >= MAX_REWARP_ATTEMPTS || !rewarpSettings.command) {
+        if (this.rewarpAttempts >= MAX_REWARP_ATTEMPTS) {
             this.macro.message('&cRewarp failed.');
             this.macro.toggle(false);
             return;
         }
 
-        ChatLib.command(rewarpSettings.command);
+        ChatLib.command('warp garden');
         this.rewarpAttempts++;
         this.nextActionAt = Date.now() + REWARP_RETRY_MS;
     }

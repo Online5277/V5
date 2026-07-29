@@ -2,8 +2,6 @@ import { ModuleBase } from '../../../utils/ModuleBase';
 import { Guis } from '../../../utils/player/Inventory';
 import { TabListUtils } from '../../../utils/TabListUtils';
 
-const MAX_REWARP_DELAY_MS = 2000;
-
 class RewarpSettings extends ModuleBase {
     constructor() {
         super({
@@ -14,9 +12,6 @@ class RewarpSettings extends ModuleBase {
         });
 
         this.looping = false;
-        this.command = 'warp garden';
-        this.delayMin = 500;
-        this.delayMax = 750;
         this.triggerRadius = 2;
         this.rewarpButtons = [];
         this.runVisitorMacro = false;
@@ -38,15 +33,6 @@ class RewarpSettings extends ModuleBase {
             'Start/End warps at the saved endpoint. Looping sets home before running barn tasks.',
             'Start/End'
         );
-        this.addTextInput('Rewarp Command', this.command, (value) => {
-            this.command = String(value || '')
-                .replace(/^\//, '')
-                .trim();
-        });
-        this.addRangeSlider('Rewarp Delay', 0, MAX_REWARP_DELAY_MS, { low: this.delayMin, high: this.delayMax }, (value) => {
-            this.delayMin = Math.round(value.low);
-            this.delayMax = Math.round(value.high);
-        });
         const triggerRadius = this.addSlider('Rewarp Trigger Radius', 0.5, 5, this.triggerRadius, (value) => (this.triggerRadius = value));
         this.addRewarpButtons(triggerRadius);
         this.addToggle(

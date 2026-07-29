@@ -39,6 +39,7 @@ class LoadoutHandler extends ModuleBase {
     }
 
     select(slot) {
+        if ([this.farmingSlot, this.pestSpawningSlot, this.pestKillingSlot, this.visitorSlot].every((loadoutSlot) => loadoutSlot === 1)) return true;
         if (this.switching) return false;
         if (slot === this.currentSlot && this.targetSlot === null) return true;
         if (this.targetSlot !== slot) {

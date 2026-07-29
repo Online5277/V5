@@ -3,6 +3,7 @@ import { ModuleBase } from '../../utils/ModuleBase';
 const MIN_TICK_DELAY = 1;
 const MAX_TICK_DELAY = 10;
 const MAX_ACTION_DELAY_MS = 1000;
+const MAX_REWARP_DELAY_MS = 2000;
 
 class FarmingDelays extends ModuleBase {
     constructor() {
@@ -29,6 +30,8 @@ class FarmingDelays extends ModuleBase {
         this.mousematActionDelayMax = 4;
         this.bazaarActionDelayMin = 250;
         this.bazaarActionDelayMax = 750;
+        this.rewarpDelayMin = 500;
+        this.rewarpDelayMax = 750;
 
         this.addDelayRange('Visitor Double Click Delay (Ticks)', 'visitorDoubleClickDelay', MIN_TICK_DELAY, MAX_TICK_DELAY);
         this.addDelayRange('Visitor Autosell Click Delay (Ticks)', 'visitorAutoSellDelay', MIN_TICK_DELAY, MAX_TICK_DELAY);
@@ -38,6 +41,7 @@ class FarmingDelays extends ModuleBase {
         this.addDelayRange('Sprayonator Action Delay (Ticks)', 'sprayonatorActionDelay', MIN_TICK_DELAY, MAX_TICK_DELAY);
         this.addDelayRange('Mousemat Action Delay (Ticks)', 'mousematActionDelay', MIN_TICK_DELAY, MAX_TICK_DELAY);
         this.addDelayRange('Bazaar Action Delay (ms)', 'bazaarActionDelay', 0, MAX_ACTION_DELAY_MS);
+        this.addDelayRange('Rewarp Delay (ms)', 'rewarpDelay', 0, MAX_REWARP_DELAY_MS);
     }
 
     addDelayRange(name, key, min, max) {
