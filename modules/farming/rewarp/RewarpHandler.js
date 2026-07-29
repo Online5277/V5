@@ -11,6 +11,7 @@ import { farmingDelays } from '../FarmingDelays';
 const PHASES = {
     BARN: 'Warping to barn',
     WAITING_FOR_BARN: 'Waiting for barn',
+    LANDING_AT_BARN: 'Landing at barn',
     DECIDING: 'Determining',
     RUNNING: 'Running task',
     REWARP: 'Rewarping',
@@ -18,11 +19,14 @@ const PHASES = {
 };
 const REWARP_RETRY_MS = 10_000;
 const MAX_REWARP_ATTEMPTS = 3;
+const BARN_SETTLE_MS = 250;
 
 class RewarpHandler {
     constructor() {
         register('chat', (event) => {
-            if (this.phase === PHASES.WAITING_FOR_BARN && event.message?.getUnformattedText?.() === 'Teleported you to The Barn!') this.phase = PHASES.DECIDING;
+            if (this.phase !== PHASES.WAITING_FOR_BARN || event.message?.getUnformattedText?.() !== 'Teleported you to The Barn!') return;
+            this.phase = PHASES.LANDING_AT_BARN;
+            this.nextActionAt = Date.now() + BARN_SETTLE_MS;
         });
     }
 
@@ -54,6 +58,14 @@ class RewarpHandler {
     }
 
     tick(player) {
+        if (this.phase === PHASES.LANDING_AT_BARN) {
+            const onGround = player.onGround();
+            Client.setKey('shift', !onGround);
+            if (!onGround) this.nextActionAt = Date.now() + BARN_SETTLE_MS;
+            else if (Date.now() >= this.nextActionAt) this.phase = PHASES.DECIDING;
+            return;
+        }
+
         if (this.phase !== PHASES.REWARP && Date.now() < this.nextActionAt) return;
 
         if (this.phase === PHASES.BARN) {
