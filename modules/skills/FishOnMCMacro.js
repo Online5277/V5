@@ -80,12 +80,10 @@ class FishOnMCMacro extends ModuleBase {
             if (title === 'BITE!') Client.rightClick();
         }).setFilteredClass(ClientboundSetTitleTextPacket);
 
-        this.on('chat', (event) => {
-            const message = ChatLib.removeFormatting(String(event.message));
-            if (message.includes('is available to turn in! Type /quests to claim it.')) {
-                this.questPending = true;
-                this.message('&eQuest queued.');
-            }
+        manager.subscribe('fishquestready', () => {
+            if (!this.enabled) return;
+            this.questPending = true;
+            this.message('&eQuest queued.');
         });
 
         this.on('tick', () => {

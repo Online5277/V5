@@ -12,6 +12,7 @@ import { rewarpHandler } from './rewarp/RewarpHandler';
 import { rewarpSettings } from './rewarp/RewarpSettings';
 import { getNearbyPest } from '../visuals/PestESP';
 import { loadoutHandler } from './LoadoutHandler';
+import { manager } from '../../utils/SkyblockEvents';
 
 const MAX_PEST_TRACK_DISTANCE = 14;
 const PEST_STALL_GRACE_TICKS = 20;
@@ -19,7 +20,6 @@ const GUI_RESUME_GRACE_TICKS = 5;
 const SPRAY_CHECK_COOLDOWN_MS = 5_000;
 const SPRAY_RESTORE_DELAY_TICKS = 3;
 const TAB_CHECK_GRACE_MS = 5_000;
-const MISSING_SPRAY_MATERIAL_REGEX = /^You don't have enough .+!$/;
 const FARMING = 'Farming';
 const PEST = 'Pest';
 const RESTORING_PEST = 'Restoring Pest';
@@ -44,10 +44,8 @@ export class FarmingMacro extends ModuleBase {
         ]);
 
         this.on('tick', () => this.handleTick());
-        this.on('chat', (event) => {
-            if (farmingSettings.useSprayonator && MISSING_SPRAY_MATERIAL_REGEX.test(event.message?.getUnformattedText?.() || '')) {
-                this.sprayonatorUnavailable = true;
-            }
+        manager.subscribe('sprayonatorunavailable', () => {
+            if (this.enabled && farmingSettings.useSprayonator) this.sprayonatorUnavailable = true;
         });
     }
 

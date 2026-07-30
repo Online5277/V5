@@ -20,6 +20,13 @@ const INCLUDE_CHECKS = {
     'expired!': 'abilitygone',
     "can't use this while": 'incombat',
     "can't fast travel while": 'incombat',
+    'Commission Complete! Visit the King to claim': 'commissioncomplete',
+    "you haven't unlocked this fast travel destination": 'fasttravellocked',
+    'Teleported you to The Barn!': 'barnteleport',
+    'Teleported you to Plot': 'plotteleport',
+    'Your tool has 0 durability left': 'wynndurability',
+    'is available to turn in! Type /quests to claim it.': 'fishquestready',
+    "You don't have enough ": 'sprayonatorunavailable',
 };
 
 const getEventName = (event) => {

@@ -6,6 +6,7 @@ import { getLoadedPests } from '../../visuals/PestESP';
 import { farmingSettings } from '../FarmingSettings';
 import { MathUtils } from '../../../utils/Math';
 import { Utils } from '../../../utils/Utils';
+import { manager } from '../../../utils/SkyblockEvents';
 
 const ANGRY_VILLAGER = net.minecraft.core.particles.ParticleTypes.ANGRY_VILLAGER;
 const PEST_RANGE_SQ = 12.5 ** 2;
@@ -25,7 +26,7 @@ const STATES = {
 class PestKiller {
     constructor() {
         register('packetReceived', (packet) => this.onParticle(packet)).setFilteredClass(ClientboundLevelParticlesPacket);
-        register('chat', (event) => this.onChat(event));
+        manager.subscribe('plotteleport', () => this.onTeleport());
     }
 
     start() {
@@ -133,11 +134,8 @@ class PestKiller {
         });
     }
 
-    onChat(event) {
+    onTeleport() {
         if (!this.running || this.currentPlot === null) return;
-        const message = event.message?.getUnformattedText?.() || '';
-        if (!message.includes('Teleported you to Plot')) return;
-
         this.teleportedToPlot = true;
     }
 

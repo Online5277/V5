@@ -7,6 +7,7 @@ import Pathfinder from '../../../utils/pathfinder/PathFinder';
 import { pestKiller } from './PestKiller';
 import { loadoutHandler } from '../LoadoutHandler';
 import { farmingDelays } from '../FarmingDelays';
+import { manager } from '../../../utils/SkyblockEvents';
 
 const PHASES = {
     BARN: 'Warping to barn',
@@ -23,8 +24,8 @@ const BARN_SETTLE_MS = 250;
 
 class RewarpHandler {
     constructor() {
-        register('chat', (event) => {
-            if (this.phase !== PHASES.WAITING_FOR_BARN || event.message?.getUnformattedText?.() !== 'Teleported you to The Barn!') return;
+        manager.subscribe('barnteleport', () => {
+            if (this.phase !== PHASES.WAITING_FOR_BARN) return;
             this.phase = PHASES.LANDING_AT_BARN;
             this.nextActionAt = Date.now() + BARN_SETTLE_MS;
         });

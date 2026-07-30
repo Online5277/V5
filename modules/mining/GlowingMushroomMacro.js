@@ -5,6 +5,7 @@
 // love it
 import { isDeveloperModeEnabled } from '../../utils/DeveloperModeState';
 import { ModuleBase } from '../../utils/ModuleBase';
+import { manager } from '../../utils/SkyblockEvents';
 import { MacroState } from '../../utils/MacroState';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
 import { Rotations } from '../../utils/player/Rotations';
@@ -60,9 +61,8 @@ class GlowingMushroomMacro extends ModuleBase {
         this.reachableCount = 0;
         this.blacklistedMushrooms = new Map();
         this.on('tick', () => this.runLoop(this.loopToken));
-        this.on('chat', (event) => {
-            const message = event.message.getUnformattedText().toLowerCase();
-            if (!this.warpStartedAt || !message.includes("you haven't unlocked this fast travel destination")) return;
+        manager.subscribe('fasttravellocked', () => {
+            if (!this.enabled || !this.warpStartedAt) return;
 
             this.message("&cYou haven't unlocked the Glowing Mushroom Cave warp.");
             this.toggle(false);

@@ -9,6 +9,7 @@ import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 import { Utils } from '../../utils/Utils';
 import { v5Command } from '../../utils/V5Commands';
+import { manager } from '../../utils/SkyblockEvents';
 import { File, Vec3d } from '../../utils/Constants';
 
 const CONFIG_DIR = 'V5Config';
@@ -135,7 +136,9 @@ class WynnProfessionMacro extends ModuleBase {
 
         this.on('tick', () => this.onTick());
         this.on('soundPlay', (_pos, name) => this.onSoundPlay(name));
-        this.on('chat', (event) => this.onChat(event));
+        manager.subscribe('wynndurability', () => {
+            if (this.enabled) this.startRepairDetour();
+        });
 
         this.when(
             () => this.enabled && this.route.length > 0,
@@ -189,13 +192,6 @@ class WynnProfessionMacro extends ModuleBase {
 
         OverlayManager.incrementTrackedValue(this.oid, 'total');
         this.advancePoint();
-    }
-
-    onChat(event) {
-        const message = event?.message?.getUnformattedText?.();
-        if (!message?.includes('Your tool has 0 durability left')) return;
-
-        this.startRepairDetour();
     }
 
     handleCommand(args) {

@@ -107,15 +107,11 @@ class ScathaMacro extends ModuleBase {
             this.isWarping = true;
         });
 
-        this.on('chat', (event) => {
+        manager.subscribe('fasttravellocked', () => {
             if (!this.enabled) return;
-            const msg = event.message.getUnformattedText();
-            const lower = (msg || '').toLowerCase();
-
-            if (lower.includes("you haven't unlocked this fast travel destination") && this.goingToCH) {
+            if (this.goingToCH) {
                 this.message("&cCan't start macro outside CH because you dont have the warp!");
                 this.toggle(false);
-                return;
             }
         });
 

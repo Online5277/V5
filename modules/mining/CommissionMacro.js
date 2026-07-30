@@ -135,12 +135,10 @@ class CommissionMacro extends ModuleBase {
 
         this.on('tick', () => this.runLogic());
 
-        this.on('chat', (event) => {
-            const msg = event.message.getUnformattedText();
-            if (msg?.includes('Commission Complete! Visit the King to claim')) {
-                OverlayManager.incrementTrackedValue(this.oid, 'commissionsCompleted');
-                this.onCommissionComplete();
-            }
+        manager.subscribe('commissioncomplete', () => {
+            if (!this.enabled) return;
+            OverlayManager.incrementTrackedValue(this.oid, 'commissionsCompleted');
+            this.onCommissionComplete();
         });
 
         manager.subscribe('fullinventory', () => {
