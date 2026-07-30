@@ -12,6 +12,7 @@ export const GuiState = {
     isOpening: false,
     macroToggleOpen: false,
     guiScale: 1,
+    limitRightPanelWidth: true,
     pendingGuiScale: null,
     myGui: new Gui(),
 
@@ -139,7 +140,8 @@ GuiRectangles.RightPanel = {
         return 4;
     },
     get width() {
-        return Math.min(440, GuiState.getGuiWidth() - GuiRectangles.LeftPanel.width - PADDING);
+        const availableWidth = GuiState.getGuiWidth() - GuiRectangles.LeftPanel.width - PADDING;
+        return GuiState.limitRightPanelWidth ? Math.min(440, availableWidth) : availableWidth;
     },
     get height() {
         return GuiState.getGuiHeight() - this.y;

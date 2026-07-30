@@ -1,5 +1,6 @@
 import { Color } from '../utils/Constants';
 import { Categories } from './categories/CategorySystem';
+import { GuiState } from './core/GuiState';
 import { THEME } from './Utils';
 
 const withAlpha = (color, alpha) => {
@@ -68,6 +69,15 @@ const initThemeSettings = () => {
         'Dimmed background behind the window.',
         'Window',
         DEFAULT_THEME.BG_OVERLAY
+    );
+
+    Categories.addSettingsToggle(
+        'Limit Content Width',
+        (value) => (GuiState.limitRightPanelWidth = !!value),
+        'Caps the main content area at 440px. Disable to use the total available width (OBJECTIVELY LOOKS BETTER).',
+        GuiState.limitRightPanelWidth,
+        'Window',
+        'Theme'
     );
 
     addThemePicker(
