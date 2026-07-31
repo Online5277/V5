@@ -16,7 +16,7 @@ class LushLilacEtherwarpNuker extends ModuleBase {
     constructor() {
         super({
             name: 'Lushlilac Etherwarp Nuker',
-            subcategory: 'Mining',
+            subcategory: 'Foraging',
             description: 'Etherwarps between flowering azaleas and nukes nearby ones.',
             isMacro: true,
         });

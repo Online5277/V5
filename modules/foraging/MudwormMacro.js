@@ -15,7 +15,7 @@ class MudwormMacro extends ModuleBase {
     constructor() {
         super({
             name: 'Mudworm Etherwarp Nuker',
-            subcategory: 'Mining',
+            subcategory: 'Foraging',
             description: 'Etherwarps to Mudworm and clicks thems.',
             isMacro: true,
         });

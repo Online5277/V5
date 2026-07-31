@@ -1,4 +1,3 @@
-import { isDeveloperModeEnabled } from '../../utils/DeveloperModeState';
 import { Vec3d } from '../../utils/Constants';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { Utils } from '../../utils/Utils';
@@ -34,7 +33,6 @@ class PestESP extends ModuleBase {
         super({
             name: 'Pest ESP',
             subcategory: 'Visuals',
-            developerMode: true,
             description: 'Scans and remembers pest locations even in distant chunks.',
         });
 
@@ -74,4 +72,4 @@ class PestESP extends ModuleBase {
     }
 }
 
-if (isDeveloperModeEnabled()) new PestESP();
+new PestESP();
