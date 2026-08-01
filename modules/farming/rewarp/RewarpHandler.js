@@ -45,7 +45,7 @@ class RewarpHandler {
         this.tasks = runVisitor ? [autoSell, visitorMacro] : [];
         if (runPhilip) this.tasks.push(philipMacro);
         const hasBarnTasks = this.tasks.length > 0;
-        if (runPestKiller) this.tasks.push(pestKiller);
+        if (runPestKiller) this.tasks.push(pestKiller, autoSell);
         this.phase = hasBarnTasks ? PHASES.BARN : this.tasks.length ? PHASES.DECIDING : PHASES.REWARP;
         this.nextActionAt = runPestKiller && !hasBarnTasks ? 0 : Date.now() + Utils.randomInt(farmingDelays.rewarpDelayMin, farmingDelays.rewarpDelayMax);
     }
