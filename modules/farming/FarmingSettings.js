@@ -37,6 +37,9 @@ class FarmingSettings extends ModuleBase {
             return false;
         }
         this.hasReportedMissingVacuum = false;
+        if (!Guis.stripFormatting(Player.getInventory()?.getStackInSlot(slot)?.getName?.() || '').includes('Hooverius')) {
+            this.message('&cOnly the maxed InfiniVacuum Hooverius is supported; you will not have enough reach to kill pests.');
+        }
         if (Player.getHeldItemIndex() === slot) return true;
         Guis.setItemSlot(slot);
         return false;
