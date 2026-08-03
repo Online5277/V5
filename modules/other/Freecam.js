@@ -1,4 +1,4 @@
-import { Vec3d } from '../../utils/Constants';
+import { GLFW, Vec3d } from '../../utils/Constants';
 import { Camera } from '../../utils/Camera';
 import { Mixin } from '../../utils/MixinManager';
 import { ModuleBase } from '../../utils/ModuleBase';
@@ -9,15 +9,14 @@ import { mc } from '../../utils/Utils';
 
 const Perspective = net.minecraft.client.CameraType;
 const InputConstants = com.mojang.blaze3d.platform.InputConstants;
-const THIRD_PERSON_DISTANCE = 4.0;
+const ClipContext = net.minecraft.world.level.ClipContext;
 
 class Freecam extends ModuleBase {
     constructor() {
         super({
             name: 'Freecam',
             subcategory: 'Visuals',
-            description: 'Detach your camera and fly it around locally.',
-            tooltip: 'Client-side freecam.',
+            description: 'Fly around, right click an entity to spectate.',
             theme: '#5fb0ff',
             autoDisableOnWorldUnload: true,
             showEnabledToggle: false,
@@ -30,51 +29,81 @@ class Freecam extends ModuleBase {
         this.velocity = new Vec3d(0, 0, 0);
         this.savedPerspective = null;
         this.lastRenderAt = 0;
+        this.possessedUUID = null;
+        this.rightClickWasDown = false;
 
-        this.addSlider('Move Speed', 10, 35, 20, (value) => (this.moveSpeed = Number(value) / 25), 'Freecam move speed.');
+        this.addSlider('Move Speed', 5, 30, 10, (value) => (this.moveSpeed = Number(value) / 25), 'Freecam move speed.');
 
+        this.on('tick', () => {
+            const rightClickDown = this.isRightClickDown();
+            if (World.isLoaded() && !Client.isInGui() && rightClickDown && !this.rightClickWasDown) {
+                if (this.possessedUUID) this.releasePossession();
+                else this.tryPossessPlayer();
+            }
+            this.rightClickWasDown = rightClickDown;
+        });
         this.on('renderWorld', () => this.onRender());
+        this.on('renderEntity', (entity, partialTicks, event) => {
+            if (this.possessedUUID && entity.getUUID().equals(this.possessedUUID)) cancel(event);
+        });
     }
 
     onEnable() {
         const player = Player.getPlayer();
-        if (!World.isLoaded() || !player) return this.toggle(false);
-
+        if (!World.isLoaded() || !player) {
+            this.resetCameraState();
+            return;
+        }
         MacroState.getModule('Freelook')?.toggle(false);
-
-        this.message('&aEnabled');
+        this.message('&aEnabled &7(Right-click an entity to spectate)');
         this.cameraPos = this.getInitialCameraPos(player, MathUtils.wrapTo180(player.getYRot()), player.getXRot());
         this.velocity = new Vec3d(0, 0, 0);
         this.savedPerspective = mc.options.getCameraType();
         this.lastRenderAt = Date.now();
+        this.possessedUUID = null;
+        this.rightClickWasDown = this.isRightClickDown();
         Mouse.forceGrab();
         Mixin.set('cameraOverrideYaw', MathUtils.wrapTo180(player.getYRot()));
         Mixin.set('cameraOverridePitch', player.getXRot());
         Mixin.set('freecamEnabled', true);
+        mc.setCameraEntity(player);
         mc.options.setCameraType(Perspective.THIRD_PERSON_BACK);
         Camera.setCameraPosition(this.cameraPos);
+        mc.levelRenderer.allChanged();
     }
 
     onDisable() {
         this.message('&cDisabled');
+        this.resetCameraState();
+        if (World.isLoaded()) mc.levelRenderer.allChanged();
+        Mouse.releaseForcedGrab();
+    }
+
+    resetCameraState() {
+        const player = Player.getPlayer();
+        if (player) mc.setCameraEntity(player);
+
         this.cameraPos = null;
         this.velocity = new Vec3d(0, 0, 0);
+        this.possessedUUID = null;
+        this.rightClickWasDown = false;
+        Mixin.set('ungrabbed', false);
         Mixin.set('freecamEnabled', false);
+        Mixin.delete('freecamSpectatedEntity');
         Mixin.delete('cameraOverrideYaw');
         Mixin.delete('cameraOverridePitch');
         Camera.clearCameraPosition();
 
-        if (this.savedPerspective) {
-            mc.options.setCameraType(this.savedPerspective);
-        }
-
+        if (this.savedPerspective) mc.options.setCameraType(this.savedPerspective);
         this.savedPerspective = null;
-        Mouse.releaseForcedGrab();
     }
 
     onRender() {
-        if (!this.enabled) return;
-        if (!World.isLoaded()) return;
+        if (!this.enabled || !World.isLoaded()) return;
+        if (this.possessedUUID) {
+            this.syncPossessedCamera();
+            return;
+        }
 
         const player = Player.getPlayer();
         if (!player) return;
@@ -115,21 +144,14 @@ class Freecam extends ModuleBase {
             moveX -= leftX;
             moveZ -= leftZ;
         }
-        if (this.isKeyDown(options.keyJump)) {
-            moveY += 1;
-        }
-        if (this.isKeyDown(options.keyShift)) {
-            moveY -= 1;
-        }
+        if (this.isKeyDown(options.keyJump)) moveY += 1;
+        if (this.isKeyDown(options.keyShift)) moveY -= 1;
 
         const magnitude = Math.hypot(moveX, moveY, moveZ) || 1;
         const hasInput = Math.abs(moveX) > 0 || Math.abs(moveY) > 0 || Math.abs(moveZ) > 0;
-
-        const targetSpeed = this.moveSpeed;
-        const targetX = hasInput ? (moveX / magnitude) * targetSpeed : 0;
-        const targetY = hasInput ? (moveY / magnitude) * targetSpeed : 0;
-        const targetZ = hasInput ? (moveZ / magnitude) * targetSpeed : 0;
-
+        const targetX = hasInput ? (moveX / magnitude) * this.moveSpeed : 0;
+        const targetY = hasInput ? (moveY / magnitude) * this.moveSpeed : 0;
+        const targetZ = hasInput ? (moveZ / magnitude) * this.moveSpeed : 0;
         const now = Date.now();
         const frames = Math.min(5, Math.max(0.1, (now - this.lastRenderAt) / 10));
         this.lastRenderAt = now;
@@ -141,8 +163,7 @@ class Freecam extends ModuleBase {
             this.velocity.z() + (targetZ - this.velocity.z()) * smoothing
         );
 
-        const velocityMagnitude = Math.hypot(this.velocity.x(), this.velocity.y(), this.velocity.z());
-        if (velocityMagnitude < 0.0005) {
+        if (Math.hypot(this.velocity.x(), this.velocity.y(), this.velocity.z()) < 0.0005) {
             this.velocity = new Vec3d(0, 0, 0);
             Camera.setCameraPosition(this.cameraPos);
             return;
@@ -153,8 +174,95 @@ class Freecam extends ModuleBase {
             this.cameraPos.y() + this.velocity.y() * frames,
             this.cameraPos.z() + this.velocity.z() * frames
         );
-
         Camera.setCameraPosition(this.cameraPos);
+    }
+
+    tryPossessPlayer() {
+        const target = this.getPlayerUnderCrosshair();
+        if (!target) return;
+
+        this.possessedUUID = target.getUUID();
+        this.velocity = new Vec3d(0, 0, 0);
+        Mixin.set('ungrabbed', true);
+        Mixin.set('freecamSpectatedEntity', target.toMC());
+        this.syncPossessedCamera();
+        this.message(`&aSpectating &f${target.getName()} &7(Right-click to release)`);
+    }
+
+    releasePossession(silent = false) {
+        const entity = this.getPossessedPlayer();
+        if (entity) {
+            const partialTicks = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+            this.cameraPos = entity.getEyePosition(partialTicks);
+            Mixin.set('cameraOverrideYaw', entity.getViewYRot(partialTicks));
+            Mixin.set('cameraOverridePitch', entity.getViewXRot(partialTicks));
+        }
+
+        this.possessedUUID = null;
+        this.velocity = new Vec3d(0, 0, 0);
+        Mixin.set('ungrabbed', false);
+        Mixin.delete('freecamSpectatedEntity');
+        Mouse.forceGrab();
+        mc.setCameraEntity(Player.getPlayer());
+        mc.options.setCameraType(Perspective.THIRD_PERSON_BACK);
+        if (this.cameraPos) Camera.setCameraPosition(this.cameraPos);
+        if (!silent) this.message('&7Released spectating');
+    }
+
+    syncPossessedCamera() {
+        const entity = this.getPossessedPlayer();
+        if (!entity) {
+            this.releasePossession(true);
+            this.message('&cThat entity is no longer loaded');
+            return;
+        }
+
+        const partialTicks = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        this.cameraPos = entity.getEyePosition(partialTicks);
+        mc.options.setCameraType(Perspective.FIRST_PERSON);
+        Camera.setCameraPosition(this.cameraPos);
+        Mixin.set('cameraOverrideYaw', entity.getViewYRot(partialTicks));
+        Mixin.set('cameraOverridePitch', entity.getViewXRot(partialTicks));
+    }
+
+    getPossessedPlayer() {
+        if (!this.possessedUUID) return null;
+        return World.getWorld()?.getPlayerByUUID(this.possessedUUID) || null;
+    }
+
+    getPlayerUnderCrosshair() {
+        if (!this.cameraPos) return null;
+
+        const yaw = Number(Mixin.get('cameraOverrideYaw', 0));
+        const pitch = Number(Mixin.get('cameraOverridePitch', 0));
+        const yawRad = (yaw * Math.PI) / 180;
+        const pitchRad = (pitch * Math.PI) / 180;
+        const cosPitch = Math.cos(pitchRad);
+        const direction = new Vec3d(-Math.sin(yawRad) * cosPitch, -Math.sin(pitchRad), Math.cos(yawRad) * cosPitch);
+        const end = this.cameraPos.add(direction.scale(128));
+        const selfUUID = Player.getUUID();
+        let nearest = null;
+        const blockHit = World.getWorld().clip(new ClipContext(this.cameraPos, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, Player.getPlayer()));
+        let nearestDistanceSq = String(blockHit.getType()) === 'MISS' ? Infinity : this.cameraPos.distanceToSqr(blockHit.getLocation());
+
+        for (const player of World.getAllPlayers()) {
+            if (player.getUUID().equals(selfUUID)) continue;
+
+            const hit = player.toMC().getBoundingBox().inflate(0.15).clip(this.cameraPos, end);
+            if (!hit.isPresent()) continue;
+
+            const distanceSq = this.cameraPos.distanceToSqr(hit.get());
+            if (distanceSq < nearestDistanceSq) {
+                nearest = player;
+                nearestDistanceSq = distanceSq;
+            }
+        }
+
+        return nearest;
+    }
+
+    isRightClickDown() {
+        return GLFW.glfwGetMouseButton(mc.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) === GLFW.GLFW_PRESS;
     }
 
     isKeyDown(keybind) {
@@ -170,7 +278,7 @@ class Freecam extends ModuleBase {
         const lookY = -Math.sin(pitchRad);
         const lookZ = Math.cos(yawRad) * cosPitch;
 
-        return new Vec3d(eyePos.x() - lookX * THIRD_PERSON_DISTANCE, eyePos.y() - lookY * THIRD_PERSON_DISTANCE, eyePos.z() - lookZ * THIRD_PERSON_DISTANCE);
+        return new Vec3d(eyePos.x() - lookX * 4.0, eyePos.y() - lookY * 4.0, eyePos.z() - lookZ * 4.0);
     }
 }
 
