@@ -1,10 +1,25 @@
-import { ArmorStandEntity, Vec3d } from '../../utils/Constants';
+import { ArmorStandEntity, EndermanEntity, Vec3d, ZombieEntity } from '../../utils/Constants';
 import { MathUtils } from '../../utils/Math';
 import { ModuleBase } from '../../utils/ModuleBase';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
 import { Movement } from '../../utils/player/Movement';
 import { Rotations } from '../../utils/player/Rotations';
 import { Raytrace } from '../../utils/Raytrace';
+
+const STATES = {
+    IDLE: 'IDLE',
+    PATHING: 'PATHING',
+    FIGHTING: 'FIGHTING',
+};
+
+const parseNames = (value) => [
+    ...new Set(
+        String(value)
+            .split(',')
+            .map((name) => name.trim().toLowerCase())
+            .filter(Boolean)
+    ),
+];
 
 const BLACKHOLE_TEXTURES = new Set([
     'ewogICJ0aW1lc3RhbXAiIDogMTczNjE4NDg2Nzc3MywKICAicHJvZmlsZUlkIiA6ICJjNmViMzdjNmE4YjM0MDI3OGJjN2FmZGE3ZjMxOWJmMyIsCiAgInByb2ZpbGVOYW1lIiA6ICJFbFJleUNhbGFiYXphbCIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS81NWI3MGYwOTRlMDE2Nzk1MDhkZDViY2EzOTY0MGVkOWVjNWM2YzY3OTJmYmQ4ZjU3YzAzYjNhMTJmOWMwYTkyIiwKICAgICAgIm1ldGFkYXRhIiA6IHsKICAgICAgICAibW9kZWwiIDogInNsaW0iCiAgICAgIH0KICAgIH0KICB9Cn0=',
@@ -15,66 +30,80 @@ const BLACKHOLE_TEXTURES = new Set([
     'ewogICJ0aW1lc3RhbXAiIDogMTczNjE5OTc0NTg5NCwKICAicHJvZmlsZUlkIiA6ICJmYjZkM2E5Zjk3MWY0ZTdlYmQ0MjE2Yjk0MjE5NDA3NCIsCiAgInByb2ZpbGVOYW1lIiA6ICJtYXJjaXhkZCIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS9jYjgzMmZjOTdkMzhjY2NhOGJkMTE4YmZiZGEyZmE1N2M1MjA4ZTFmYmJkNmI4ZWE0MjhmNzBjN2NhMTY1NmY0IiwKICAgICAgIm1ldGFkYXRhIiA6IHsKICAgICAgICAibW9kZWwiIDogInNsaW0iCiAgICAgIH0KICAgIH0KICB9Cn0=',
 ]);
 
-const BLACKHOLE_AVOID_RADIUS = 8.5;
 const ATTACK_REACH = 4;
+const PATH_HANDOFF_DISTANCE = 6;
+const REPATH_DISTANCE = 7;
+const REPATH_DELAY_MS = 1200;
+const PATH_FAILURE_BLACKLIST_MS = 5000;
+const VISIBILITY_GRACE_MS = 750;
+
+const BLACKHOLE_AVOID_RADIUS = 8.5;
 const BLACKHOLE_SCAN_INTERVAL = 10;
 const BLACKHOLE_SCAN_RADIUS = 30;
 const BLACKHOLE_SCAN_Y_RANGE = 20;
 const BLACKHOLE_MEMORY_MS = 60000;
-const BLACKHOLE_FORGET_CHECK_RADIUS = 20;
 const BLACKHOLE_MERGE_RADIUS = 2.5;
 
-const SEARCH_TARGET_TIMEOUT_MS = 15000;
-const TARGET_BLACKLIST_MS = 10000;
-
-const COMBAT_STATE = {
-    IDLE: 'IDLE',
-    PATHING: 'PATHING',
-    APPROACHING: 'APPROACHING',
-    ATTACKING: 'ATTACKING',
+const COMBAT_PRESETS = {
+    Graveyard: {
+        entityClass: ZombieEntity,
+        checkVisibility: false,
+        boundaryCheck: (x, y) => y >= 60 && y <= 100 && x <= -72,
+    },
+    Endermen: {
+        entityClass: EndermanEntity,
+        checkVisibility: true,
+    },
+    Goblins: {
+        names: ['Goblin', 'Weakling', 'Knifethrower', 'Fireslinger'],
+        checkVisibility: true,
+        boundaryCheck: (x, y, z) => y > 127 && !(z > 153 && x < -157) && !(z < 148 && x > -77),
+    },
+    'Ice Walkers': {
+        names: ['Ice Walker', 'Glacite Walker'],
+        checkVisibility: true,
+        boundaryCheck: (x, y, z) => y >= 127 && y <= 145 && z <= 180 && z >= 130 && x <= 80,
+    },
 };
 
 class Combat extends ModuleBase {
     constructor() {
         super({
-            name: 'Combat Bot Settings',
+            name: 'Combat Bot',
             subcategory: 'Combat',
-            description: 'Shared settings for modules that use Combat Bot.',
-            tooltip: 'Only used by modules that use Combat Bot.',
+            description: 'Automatically hunts entities matching configured names.',
+            tooltip: 'Enter one or more entity names, then toggle with the module keybind.',
             theme: '#c74d4d',
-            showEnabledToggle: false,
+            isMacro: true,
         });
 
+        this.bindToggleKey('Toggle Combat Bot');
+
         this.externalTargets = null;
-
-        this.target = null;
+        this.enabledPresets = new Set(['Graveyard']);
+        this.targetNames = [];
+        this.targetNameBlacklist = [];
         this.targets = [];
-        this.blacklistedTargets = new Map();
-        this.failedPathCallbacks = new Map();
+        this.target = null;
+        this.trackedTarget = null;
+        this.state = STATES.IDLE;
 
+        this.pathToken = 0;
+        this.pathStartedAt = 0;
+        this.pathTargetPosition = null;
+        this.nextAttackAt = 0;
+
+        this.blacklistedTargets = new Map();
+        this.visibleUntil = new Map();
         this.activeBlackholes = [];
         this.scanTicker = 0;
 
-        this.combatState = COMBAT_STATE.IDLE;
         this.attackRange = ATTACK_REACH;
         this.pathfindingThreshold = 15;
         this.attackCPS = 10;
-
-        this.lastAttackTime = 0;
-        this.isPathing = false;
-        this.lastPathTarget = null;
-        this.pathTargetMoveThreshold = 3;
-        this.currentPathStartTime = 0;
-        this.targetStickinessRange = 10;
-        this.recentVisibility = new Map();
-        this.visibilityGraceMs = 1200;
-        this.visibilityGraceDistance = 6;
-        this.mobMemory = [];
-        this.mobMemoryMax = 8;
-        this.mobMemoryExpiryMs = 120000;
-        this.searchTarget = null;
-        this.searchTargetSetTime = 0;
-        this.pathRequestToken = 0;
+        this.attackButton = 'Left Click';
+        this.overrideRotationSpeed = false;
+        this.combatRotationSpeed = 400;
 
         this.addSlider(
             'Pathfinding Threshold',
@@ -84,7 +113,7 @@ class Combat extends ModuleBase {
             (value) => {
                 this.pathfindingThreshold = value;
             },
-            'Distance to use pathfinding vs direct walking'
+            'Distance to switch from direct pursuit to pathfinding'
         );
 
         this.addSlider(
@@ -95,16 +124,78 @@ class Combat extends ModuleBase {
             (value) => {
                 this.attackCPS = value;
             },
-            'Attacks per second'
+            'Average attacks per second'
+        );
+
+        this.addMultiToggle(
+            'Attack Button',
+            ['Left Click', 'Right Click'],
+            true,
+            (selected) => {
+                this.attackButton = selected.find((item) => item.enabled)?.name || 'Left Click';
+            },
+            'Mouse button used to attack.',
+            'Left Click'
+        );
+
+        let rotationSpeedSlider;
+        this.addToggle(
+            'Override Rotation Speed',
+            (value) => {
+                this.overrideRotationSpeed = !!value;
+                rotationSpeedSlider.visible = this.overrideRotationSpeed;
+                this.refreshTargetRotation();
+            },
+            'Use a Combat Bot-specific rotation speed instead of the global setting.'
+        );
+        rotationSpeedSlider = this.addSlider(
+            'Combat Rotation Speed',
+            30,
+            60,
+            40,
+            (value) => {
+                this.combatRotationSpeed = value * 10;
+                if (this.overrideRotationSpeed) this.refreshTargetRotation();
+            },
+            'Degrees per second.'
+        );
+        rotationSpeedSlider.visible = false;
+
+        this.addMultiToggle(
+            'Target Presets',
+            Object.keys(COMBAT_PRESETS),
+            false,
+            (selected) => {
+                this.enabledPresets.clear();
+                selected.forEach((item) => {
+                    if (item.enabled && COMBAT_PRESETS[item.name]) this.enabledPresets.add(item.name);
+                });
+            },
+            'Select built-in mob types to target when running standalone.',
+            'Graveyard'
+        );
+
+        this.addTextInput(
+            'Target Names',
+            '',
+            (value) => (this.targetNames = parseNames(value)),
+            'Generic internal entity names separated by commas. Use presets for location-specific mobs.'
+        );
+
+        this.addTextInput(
+            'Target Name Blacklist',
+            '',
+            (value) => (this.targetNameBlacklist = parseNames(value)),
+            'Case-insensitive entity names to exclude, separated by commas.'
         );
 
         this.createOverlay([
             {
                 title: 'Status',
                 data: {
-                    State: () => this.combatState,
+                    State: () => this.state,
                     Target: () => this.getTargetDisplayName(this.target),
-                    'Targets Found': () => (this.targets ? this.targets.length : 0),
+                    'Targets Found': () => this.targets.length,
                     'Known Blackholes': () => this.activeBlackholes.length,
                 },
             },
@@ -114,522 +205,206 @@ class Combat extends ModuleBase {
         this.on('tick', () => this.onTick());
     }
 
-    renderTargets() {
-        if (this.targets.length === 0 && this.activeBlackholes.length === 0) return;
-
-        if (this.target) {
-            const targetUuid = this.getTargetUuid(this.target);
-            if (!targetUuid || !this.blacklistedTargets.has(targetUuid)) {
-                const pos = this.getTargetPosition(this.target);
-                if (pos && this.isPositionSafe(pos.x, pos.y, pos.z)) {
-                    const entity = this.target.toMC ? this.target.toMC() : this.target;
-                    RenderUtils.drawHitbox(entity, new RenderColor(255, 0, 0, 100), 7, false);
-                }
-            }
-        }
-
-        this.targets.forEach((target) => {
-            if (target === this.target) return;
-            const targetUuid = this.getTargetUuid(target);
-            if (targetUuid && this.blacklistedTargets.has(targetUuid)) return;
-
-            const pos = this.getTargetPosition(target);
-            if (pos && !this.isPositionSafe(pos.x, pos.y, pos.z)) return;
-
-            const entity = target.toMC ? target.toMC() : target;
-            RenderUtils.drawHitbox(entity, new RenderColor(0, 70, 200, 100), 3, false);
-        });
-
-        if (this.activeBlackholes.length > 0) {
-            this.activeBlackholes.forEach((bh) => {
-                RenderUtils.drawFilledBox(new Vec3d(bh.x - 0.5, bh.y + 0.5, bh.z - 0.5), new RenderColor(0, 0, 0, 150), false);
-            });
-        }
-    }
-
     onTick() {
         if (!this.enabled) return;
-        if (!Client.isInChat() && Client.isInGui()) return;
-
-        try {
-            this.scanBlackholes();
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
+        if (!Client.isInChat() && Client.isInGui()) {
+            this.pauseMovement();
+            return;
         }
 
-        const now = Date.now();
-        this.expireBlacklistedTargets(now);
-
-        this.pruneVisibilityHistory(now);
-        this.pruneMobMemory(now);
-
+        this.scanBlackholes();
+        this.expireTargetData();
         this.targets = this.getTargets();
-        if (this.target && this.isTargetInvalid(this.target)) {
-            this.stopCombat();
-            return;
-        }
 
-        const previousTarget = this.target;
-        if (!this.target) this.target = this.bestTarget();
+        if (this.target && !this.isTargetUsable(this.target)) this.setTarget(null);
         if (!this.target) {
-            if (this.trySearch()) return;
-            this.setState(COMBAT_STATE.IDLE);
+            this.setTarget(this.bestTarget());
+            const position = this.getTargetPosition(this.target);
+            if (!position) this.setState(STATES.IDLE);
+            else {
+                const distance = this.getDistanceToPlayer(position);
+                if (distance.distance <= this.attackRange && this.canSeeTarget(this.target)) this.engage(position, distance);
+                else this.startPath(position);
+            }
             return;
         }
 
-        if (this.searchTarget) this.cancelSearchTarget();
-
-        const pos = this.getTargetPosition(this.target);
-        if (!pos) return;
-
-        const distanceData = this.getDistanceToPlayer(pos);
-        const targetChanged = previousTarget !== this.target;
-        if (targetChanged && this.combatState !== COMBAT_STATE.PATHING) {
-            this.setState(COMBAT_STATE.IDLE);
-        }
-
-        this.handleState(pos, distanceData);
-    }
-
-    getTargetDisplayName(target) {
-        if (!target) return 'None';
-        if (target.getName) return ChatLib.removeFormatting(target.getName());
-        return target.name || 'Unknown';
-    }
-
-    expireBlacklistedTargets(now = Date.now()) {
-        for (const [uuid, expiry] of this.blacklistedTargets.entries()) {
-            if (now > expiry) this.blacklistedTargets.delete(uuid);
-        }
-    }
-
-    scanBlackholes() {
-        this.scanTicker++;
-        if (this.scanTicker % BLACKHOLE_SCAN_INTERVAL !== 0) return;
-
-        const stands = World.getAllEntitiesOfType(ArmorStandEntity);
-        const visibleBlackholes = [];
-        const playerX = Player.getX();
-        const playerY = Player.getY();
-        const playerZ = Player.getZ();
-
-        for (const stand of stands || []) {
-            try {
-                const dx = stand.getX() - playerX;
-                const dy = stand.getY() - playerY;
-                const dz = stand.getZ() - playerZ;
-                if (Math.abs(dx) > BLACKHOLE_SCAN_RADIUS || Math.abs(dz) > BLACKHOLE_SCAN_RADIUS || Math.abs(dy) > BLACKHOLE_SCAN_Y_RANGE) continue;
-
-                const headItem = stand.getStackInSlot(5);
-                if (!headItem) continue;
-
-                if (this.isBlackholeHead(headItem)) {
-                    visibleBlackholes.push({ x: stand.getX(), y: stand.getY(), z: stand.getZ() });
-                }
-            } catch (e) {
-                console.error('V5 Caught error' + e + e.stack);
-            }
-        }
-
-        const now = Date.now();
-
-        visibleBlackholes.forEach((pos) => {
-            const existing = this.activeBlackholes.find((bh) => this.getDistanceBetween(bh, pos).distanceFlat <= BLACKHOLE_MERGE_RADIUS);
-            if (existing) {
-                existing.x = pos.x;
-                existing.y = pos.y;
-                existing.z = pos.z;
-                existing.lastSeen = now;
-                return;
-            }
-            this.activeBlackholes.push({ x: pos.x, y: pos.y, z: pos.z, lastSeen: now });
-        });
-
-        this.activeBlackholes = this.activeBlackholes.filter((bh) => {
-            const age = now - (bh.lastSeen || 0);
-            if (age <= BLACKHOLE_MEMORY_MS) return true;
-
-            const distance = this.getDistanceBetween({ x: playerX, y: playerY, z: playerZ }, bh);
-            return distance.distanceFlat > BLACKHOLE_FORGET_CHECK_RADIUS;
-        });
-    }
-
-    isBlackholeHead(item) {
-        try {
-            const mcItem = item?.toMC ? item.toMC() : item;
-            if (!mcItem) return false;
-
-            const profileType = net.minecraft.core.component.DataComponents.PROFILE;
-            const profileComponent = mcItem.get(profileType);
-            const profileString = profileComponent?.partialProfile?.()?.toString() || '';
-            if (!profileString) return false;
-
-            for (const base64 of BLACKHOLE_TEXTURES) {
-                if (profileString.includes(base64)) return true;
-            }
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-        }
-        return false;
-    }
-
-    isPositionSafe(x, y, z) {
-        if (!this.activeBlackholes || this.activeBlackholes.length === 0) return true;
-
-        for (const bh of this.activeBlackholes) {
-            const distanceData = this.getDistanceBetween({ x, y, z }, bh);
-            if (distanceData.distanceFlat < BLACKHOLE_AVOID_RADIUS) return false;
-        }
-        return true;
-    }
-
-    recordVisibility(entity) {
-        const uuid = this.getTargetUuid(entity);
-        if (!uuid) return;
-        const pos = this.getTargetPosition(entity);
-        if (!pos) return;
-        this.recentVisibility.set(uuid, { x: pos.x, y: pos.y, z: pos.z, time: Date.now() });
-    }
-
-    pruneVisibilityHistory(now = Date.now()) {
-        for (const [uuid, record] of this.recentVisibility.entries()) {
-            if (now - record.time > this.visibilityGraceMs) this.recentVisibility.delete(uuid);
-        }
-    }
-
-    isVisibleOrRecent(entity, checkVisibility) {
-        if (!checkVisibility) return true;
-        const playerMP = Player.asPlayerMP();
-        if (!playerMP) return true;
-
-        let visible = false;
-        try {
-            visible = playerMP.canSeeEntity(entity);
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-            return true;
-        }
-
-        if (visible) {
-            this.recordVisibility(entity);
-            return true;
-        }
-
-        const uuid = this.getTargetUuid(entity);
-        if (!uuid) return false;
-
-        const record = this.recentVisibility.get(uuid);
-        if (!record) return false;
-        if (Date.now() - record.time > this.visibilityGraceMs) return false;
-
-        const pos = this.getTargetPosition(entity);
-        if (!pos) return false;
-
-        const distanceData = this.getDistanceBetween(pos, record);
-        return distanceData.distance <= this.visibilityGraceDistance;
-    }
-
-    rememberMobPosition(pos) {
-        if (!pos) return;
-        const now = Date.now();
-        this.pruneMobMemory(now);
-
-        const existing = this.mobMemory.find((m) => this.getDistanceBetween(m, pos).distance < 3);
-        if (existing) {
-            existing.time = now;
+        const position = this.getTargetPosition(this.target);
+        if (!position) {
+            this.setTarget(null);
             return;
         }
 
-        this.mobMemory.push({ x: pos.x, y: pos.y, z: pos.z, time: now });
-        if (this.mobMemory.length > this.mobMemoryMax) this.mobMemory.shift();
-    }
+        const distance = this.getDistanceToPlayer(position);
 
-    getForwardVector() {
-        try {
-            const yaw = Player.getYaw();
-            const rad = (yaw * Math.PI) / 180;
-            return { x: -Math.sin(rad), z: Math.cos(rad) };
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-            return { x: 0, z: 1 };
-        }
-    }
-
-    pruneMobMemory(now = Date.now()) {
-        if (!this.mobMemory || this.mobMemory.length === 0) return;
-        this.mobMemory = this.mobMemory.filter((m) => now - m.time <= this.mobMemoryExpiryMs);
-    }
-
-    pickSearchTarget() {
-        if (!this.mobMemory || this.mobMemory.length === 0) return null;
-
-        const forward = this.getForwardVector();
-        const px = Player.getX();
-        const pz = Player.getZ();
-        let best = null;
-        let bestScore = Infinity;
-
-        this.mobMemory.forEach((m) => {
-            const dx = m.x - px;
-            const dz = m.z - pz;
-            const dist = this.getDistanceToPlayer(m).distanceFlat;
-            const dirDot = dist > 0 ? (dx * forward.x + dz * forward.z) / dist : 1;
-            const score = dist - dirDot * 6;
-            if (score < bestScore) {
-                bestScore = score;
-                best = m;
+        if (this.state === STATES.PATHING) {
+            if (
+                Date.now() - this.pathStartedAt >= REPATH_DELAY_MS &&
+                this.pathTargetPosition &&
+                this.getDistanceBetween(position, this.pathTargetPosition).distanceFlat >= REPATH_DISTANCE
+            ) {
+                this.startPath(position);
             }
-        });
-
-        return best ? { x: best.x, y: best.y, z: best.z } : null;
-    }
-
-    clearSearchTarget(pos) {
-        if (pos) {
-            this.mobMemory = this.mobMemory.filter((m) => this.getDistanceBetween(m, pos).distance > 3);
-        }
-        this.cancelSearchTarget();
-        if (!this.target) this.setState(COMBAT_STATE.IDLE);
-    }
-
-    cancelSearchTarget() {
-        this.searchTarget = null;
-        this.searchTargetSetTime = 0;
-    }
-
-    trySearch() {
-        this.pruneMobMemory();
-        if (!this.mobMemory || this.mobMemory.length === 0) return false;
-
-        if (this.searchTarget) {
-            const distanceData = this.getDistanceToPlayer(this.searchTarget);
-            const timedOut = Date.now() - this.searchTargetSetTime > SEARCH_TARGET_TIMEOUT_MS;
-            if (distanceData.distance <= 2.5 || timedOut) this.clearSearchTarget(this.searchTarget);
-        }
-
-        if (!this.searchTarget && (!this.mobMemory || this.mobMemory.length === 0)) return false;
-
-        if (!this.searchTarget) {
-            const next = this.pickSearchTarget();
-            if (!next) return false;
-            this.searchTarget = next;
-            this.searchTargetSetTime = Date.now();
-        }
-
-        if (!this.isPathing || this.combatState !== COMBAT_STATE.PATHING) {
-            this.startPathingToSearch(this.searchTarget);
-        }
-
-        return true;
-    }
-
-    startPathingToSearch(pos) {
-        if (!pos) return;
-        if (!this.isPositionSafe(pos.x, pos.y, pos.z)) {
-            this.clearSearchTarget(pos);
             return;
         }
 
-        const end = this.buildPathEndpoints(pos);
-        this.lastPathTarget = { x: pos.x, y: pos.y, z: pos.z };
-        this.isPathing = true;
-        this.setState(COMBAT_STATE.PATHING);
-        this.currentPathStartTime = Date.now();
-        const pathToken = ++this.pathRequestToken;
+        const pathThreshold = this.state === STATES.FIGHTING ? this.pathfindingThreshold + 2 : this.pathfindingThreshold;
+        if (distance.distanceFlat > pathThreshold || (distance.distance > this.attackRange && !this.canSeeTarget(this.target))) {
+            this.startPath(position);
+            return;
+        }
 
-        Pathfinder.resetPath();
-        Pathfinder.findPath(end, (success) => {
-            if (pathToken !== this.pathRequestToken) return;
-
-            if (!success) {
-                this.clearSearchTarget(pos);
-                return;
-            }
-
-            this.clearSearchTarget(pos);
-        });
+        this.engage(position, distance);
     }
 
-    startRotationToTarget() {
+    setTarget(target) {
+        if (this.sameTarget(this.target, target)) return;
+
+        this.cancelPath();
+        Client.stopMovement();
+        Rotations.stop();
+        this.trackedTarget = null;
+        this.target = target;
+        this.nextAttackAt = 0;
+        this.setState(STATES.IDLE);
+
+        this.trackTarget();
+    }
+
+    trackTarget() {
+        if (!this.target || this.trackedTarget === this.target) return;
+        const options = this.overrideRotationSpeed ? { rotationSpeed: this.combatRotationSpeed } : { speedMultiplier: 0.9 };
+        if (Rotations.trackEntity(this.target, options)) this.trackedTarget = this.target;
+    }
+
+    refreshTargetRotation() {
         if (!this.target) return;
-        Rotations.trackEntity(this.target);
+        this.trackedTarget = null;
+        this.trackTarget();
     }
 
-    isAimingAtTarget() {
-        if (!this.target) return false;
-        try {
-            return Raytrace.isLookingAtEntity(this.target, this.attackRange + 0.5);
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-            return false;
-        }
-    }
+    engage(position, distance) {
+        this.setState(STATES.FIGHTING);
+        this.trackTarget();
 
-    stopCombat() {
-        this.target = null;
-        this.setState(COMBAT_STATE.IDLE, true);
-    }
-
-    setState(state, force = false) {
-        if (!force && this.combatState === state) return;
-        this.onExitState(this.combatState);
-        this.combatState = state;
-        this.onEnterState(state);
-    }
-
-    onExitState(state) {
-        switch (state) {
-            case COMBAT_STATE.PATHING:
-                Pathfinder.resetPath();
-                this.isPathing = false;
-                break;
-            case COMBAT_STATE.APPROACHING:
-            case COMBAT_STATE.ATTACKING:
-                Client.stopMovement();
-                break;
-        }
-    }
-
-    onEnterState(state) {
-        switch (state) {
-            case COMBAT_STATE.IDLE:
-            case COMBAT_STATE.PATHING:
-                Client.stopMovement();
-                Rotations.stop();
-                break;
-            case COMBAT_STATE.APPROACHING:
-                Pathfinder.resetPath();
-                this.isPathing = false;
-                break;
-            case COMBAT_STATE.ATTACKING:
-                Pathfinder.resetPath();
-                this.isPathing = false;
-                Client.stopMovement();
-                break;
-        }
-    }
-
-    handleState(pos, distanceData) {
-        switch (this.combatState) {
-            case COMBAT_STATE.IDLE:
-                return this.handleIdleState(pos, distanceData);
-            case COMBAT_STATE.PATHING:
-                return this.handlePathingState(pos, distanceData);
-            case COMBAT_STATE.APPROACHING:
-                return this.handleApproachingState(pos, distanceData);
-            case COMBAT_STATE.ATTACKING:
-                return this.handleAttackingState(pos, distanceData);
-        }
-    }
-
-    handleIdleState(pos, distanceData) {
-        if (distanceData.distance > this.pathfindingThreshold) return this.startPathingToTarget(pos);
-        if (distanceData.distance > this.attackRange) return this.setState(COMBAT_STATE.APPROACHING);
-        this.setState(COMBAT_STATE.ATTACKING);
-    }
-
-    handlePathingState(pos, distanceData) {
-        if (this.lastPathTarget) {
-            const targetMoved = this.getDistanceBetween(pos, this.lastPathTarget);
-            if (targetMoved.distance > this.pathTargetMoveThreshold) {
-                this.startPathingToTarget(pos);
-                return;
-            }
+        if (distance.distanceFlat > 2.8) {
+            Movement.setKeysForStraightLineCoords(position.x, position.y, position.z, true, true);
+            Client.setKey('sprint', true);
+        } else {
+            Client.stopMovement();
         }
 
-        if (distanceData.distance <= this.attackRange) {
-            this.setState(COMBAT_STATE.ATTACKING);
-        }
+        if (distance.distanceY < -1.5) Client.setKey('space', true);
+        this.tryAttack(distance.distance);
     }
 
-    handleApproachingState(pos, distanceData) {
-        if (distanceData.distance <= this.attackRange) {
-            this.setState(COMBAT_STATE.ATTACKING);
+    tryAttack(distance) {
+        const now = Date.now();
+        if (distance > this.attackRange + 0.35 || now < this.nextAttackAt) return;
+        if (!Raytrace.isLookingAtEntity(this.target, this.attackRange + 0.5)) return;
+
+        if (this.attackButton === 'Right Click') Client.rightClick();
+        else Client.leftClick();
+        const jitter = 0.82 + Math.random() * 0.36;
+        this.nextAttackAt = now + (1000 / this.attackCPS) * jitter;
+    }
+
+    startPath(position) {
+        if (!this.isPositionSafe(position.x, position.y, position.z)) {
+            this.setTarget(null);
             return;
         }
 
-        if (distanceData.distance > this.pathfindingThreshold) {
-            this.startPathingToTarget(pos);
-            return;
-        }
+        this.cancelPath();
+        this.trackTarget();
+        this.setState(STATES.PATHING);
+        this.pathStartedAt = Date.now();
+        this.pathTargetPosition = { ...position };
 
-        Movement.setKeysForStraightLineCoords(pos.x, pos.y, pos.z, true, true);
-        Client.setKey('sprint', true);
-        this.startRotationToTarget();
-    }
+        const candidates = this.targets.filter((target) => this.isTargetUsable(target));
+        const goals = [];
+        candidates.forEach((target) => {
+            const targetPosition = this.getTargetPosition(target);
+            if (targetPosition) goals.push(...this.buildPathGoals(targetPosition));
+        });
+        let target = this.target;
+        const token = ++this.pathToken;
+        Pathfinder.findPath(goals, (success) => this.onPathComplete(token, target, success), {
+            resolveEntityTarget: (result) => {
+                const selected = this.getPathResultTarget(result, candidates);
+                const selectedPosition = this.getTargetPosition(selected);
+                if (!selectedPosition) return null;
 
-    handleAttackingState(pos, distanceData) {
-        if (distanceData.distance > this.pathfindingThreshold) {
-            this.startPathingToTarget(pos);
-            return;
-        }
-
-        if (distanceData.distance > this.attackRange * 1.5) {
-            this.setState(COMBAT_STATE.APPROACHING);
-            return;
-        }
-
-        if (distanceData) this.tryAttack();
-        this.startRotationToTarget();
-
-        Movement.setKeysForStraightLineCoords(pos.x, pos.y, pos.z, true, true);
-        if (distanceData.distanceFlat <= 2) Client.stopMovement();
-        if (distanceData.distanceY < -3) {
-            Client.setKey('space', true);
-        }
-        Client.setKey('sprint', true);
-    }
-
-    startPathingToTarget(pos) {
-        if (!this.isPositionSafe(pos.x, pos.y, pos.z)) {
-            this.message('&cTarget is inside a Blackhole! Aborting path.');
-            this.blacklistTarget(this.target, TARGET_BLACKLIST_MS);
-            this.target = null;
-            this.setState(COMBAT_STATE.IDLE);
-            return;
-        }
-
-        const end = this.buildPathEndpoints(pos);
-
-        this.lastPathTarget = { x: pos.x, y: pos.y, z: pos.z };
-        this.isPathing = true;
-        this.setState(COMBAT_STATE.PATHING);
-        this.currentPathStartTime = Date.now();
-        const pathToken = ++this.pathRequestToken;
-
-        const pathTarget = this.target;
-        const pathTargetUuid = this.getTargetUuid(pathTarget);
-
-        Pathfinder.resetPath();
-        Pathfinder.findPath(end, (success) => {
-            if (pathToken !== this.pathRequestToken) return;
-
-            if (!success) {
-                if (pathTarget && this.recordFailedPathCallback(pathTarget)) {
-                    this.target = null;
-                    this.setState(COMBAT_STATE.IDLE);
-                    return;
+                target = selected;
+                this.pathTargetPosition = { ...selectedPosition };
+                if (!this.sameTarget(this.target, selected)) {
+                    this.target = selected;
+                    this.trackedTarget = null;
+                    this.nextAttackAt = 0;
+                    this.trackTarget();
                 }
-                this.setState(COMBAT_STATE.APPROACHING);
-                return;
-            }
 
-            if (pathTargetUuid) this.failedPathCallbacks.delete(pathTargetUuid);
-
-            if (this.target && !this.isTargetInvalid(this.target)) {
-                const currentPos = this.getTargetPosition(this.target);
-                const distanceData = currentPos ? this.getDistanceToPlayer(currentPos) : null;
-                this.setState((distanceData?.distance ?? Infinity) <= this.attackRange ? COMBAT_STATE.ATTACKING : COMBAT_STATE.APPROACHING);
-            } else {
-                this.setState(COMBAT_STATE.IDLE);
-            }
+                return { target: selected, goals: this.buildPathGoals(selectedPosition) };
+            },
+            entityTrackDistance: 8,
+            walkArrivalRadius: PATH_HANDOFF_DISTANCE,
+            avoidPoints: this.activeBlackholes,
+            avoidRadius: Math.ceil(BLACKHOLE_AVOID_RADIUS),
+            silent: true,
         });
     }
 
-    buildPathEndpoints(pos) {
-        const x = Math.floor(pos.x);
-        const y = Math.floor(pos.y);
-        const z = Math.floor(pos.z);
+    getPathResultTarget(result, candidates) {
+        const path = result?.path;
+        const end = path && path.length ? path[path.length - 1] : null;
+        if (!end) return this.target;
+
+        const best = candidates.reduce((closest, candidate) => {
+            const position = this.getTargetPosition(candidate);
+            if (!position) return closest;
+            const distance = this.getDistanceBetween(end, position).distance;
+            return !closest || distance < closest.distance ? { target: candidate, distance } : closest;
+        }, null);
+        return best ? best.target : this.target;
+    }
+
+    onPathComplete(token, target, success) {
+        if (token !== this.pathToken || this.state !== STATES.PATHING || !this.sameTarget(this.target, target)) return;
+
+        this.pathTargetPosition = null;
+        if (success && this.isTargetUsable(target)) {
+            this.setState(STATES.FIGHTING);
+            this.trackTarget();
+            return;
+        }
+
+        this.blacklistTarget(target, PATH_FAILURE_BLACKLIST_MS);
+        this.setTarget(null);
+    }
+
+    cancelPath() {
+        this.pathToken++;
+        this.pathTargetPosition = null;
+        if (this.state === STATES.PATHING || Pathfinder.isPathing()) Pathfinder.resetPath();
+    }
+
+    pauseMovement() {
+        if (this.state === STATES.IDLE && !this.trackedTarget) return;
+        this.cancelPath();
+        Client.stopMovement();
+        Rotations.stop();
+        this.trackedTarget = null;
+        this.setState(STATES.IDLE);
+    }
+
+    setState(state) {
+        this.state = state;
+    }
+
+    buildPathGoals(position) {
+        const x = Math.floor(position.x);
+        const y = Math.floor(position.y);
+        const z = Math.floor(position.z);
         return [
             [x, y - 1, z],
             [x, y, z],
@@ -637,87 +412,157 @@ class Combat extends ModuleBase {
         ];
     }
 
+    bestTarget() {
+        let best = null;
+        let bestScore = Infinity;
+
+        this.targets.forEach((target) => {
+            if (!this.isTargetUsable(target)) return;
+            const position = this.getTargetPosition(target);
+            if (!position) return;
+
+            const distance = this.getDistanceToPlayer(position).distance;
+            const turn = MathUtils.angleToPlayer([position.x, position.y, position.z]).distance;
+            const score = distance + turn * 0.025;
+            if (score < bestScore) {
+                best = target;
+                bestScore = score;
+            }
+        });
+
+        return best;
+    }
+
+    isTargetUsable(target) {
+        if (!target) return false;
+
+        try {
+            const entity = target.toMC ? target.toMC() : target;
+            if (!entity || entity.isRemoved?.() || entity.isDeadOrDying?.() || target.isDead?.()) return false;
+
+            const uuid = this.getTargetUuid(target);
+            if (uuid && this.blacklistedTargets.has(uuid)) return false;
+
+            const position = this.getTargetPosition(target);
+            if (!position || !this.isPositionSafe(position.x, position.y, position.z)) return false;
+
+            return this.targets.some((candidate) => this.sameTarget(candidate, target));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    sameTarget(first, second) {
+        if (first === second) return true;
+        if (!first || !second) return false;
+        const firstUuid = this.getTargetUuid(first);
+        return firstUuid !== null && firstUuid === this.getTargetUuid(second);
+    }
+
     getTargetUuid(target) {
         try {
-            if (!target) return null;
-            if (target.getUUID) return target.getUUID().toString();
-            const mcTarget = target.toMC?.();
-            if (mcTarget?.getUUID) return mcTarget.getUUID().toString();
-            return null;
+            const entity = target?.toMC ? target.toMC() : target;
+            return entity?.getUUID?.()?.toString() || null;
         } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
             return null;
+        }
+    }
+
+    getTargetPosition(target) {
+        try {
+            const entity = target?.toMC ? target.toMC() : target;
+            if (!entity?.getX) return null;
+            return { x: entity.getX(), y: entity.getY(), z: entity.getZ() };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    getDistanceToPlayer(position) {
+        return MathUtils.getDistanceToPlayer(position.x, position.y, position.z);
+    }
+
+    getDistanceBetween(first, second) {
+        return MathUtils.getDistance(first.x, first.y, first.z, second.x, second.y, second.z);
+    }
+
+    canSeeTarget(target) {
+        try {
+            return Player.asPlayerMP()?.canSeeEntity(target) ?? true;
+        } catch (e) {
+            return true;
         }
     }
 
     blacklistTarget(target, duration) {
         const uuid = this.getTargetUuid(target);
-        if (!uuid) return;
-        this.blacklistedTargets.set(uuid, Date.now() + duration);
+        if (uuid) this.blacklistedTargets.set(uuid, Date.now() + duration);
     }
 
-    recordFailedPathCallback(target) {
-        const uuid = this.getTargetUuid(target);
+    expireTargetData() {
+        const now = Date.now();
+        for (const [uuid, expiry] of this.blacklistedTargets) {
+            if (now >= expiry) this.blacklistedTargets.delete(uuid);
+        }
+        for (const [uuid, expiry] of this.visibleUntil) {
+            if (now >= expiry) this.visibleUntil.delete(uuid);
+        }
+    }
+
+    findMob(config, whitelist = null) {
+        if (!config?.entityClass && !Array.isArray(config?.names)) return [];
+
+        const names = config.names?.map((name) => name.toLowerCase());
+        const entities = config.entityClass ? World.getAllEntitiesOfType(config.entityClass) : World.getAllEntities();
+
+        return entities.filter((entity) => {
+            try {
+                const uuid = entity.getUUID();
+                if (whitelist?.has(uuid)) return false;
+                if (names && !names.some((candidate) => this.getCleanEntityName(entity).includes(candidate))) return false;
+                if (entity.isSpectator?.() || entity.isInvisible?.() || entity.isDead?.()) return false;
+                if (config.boundaryCheck && !config.boundaryCheck(entity.getX(), entity.getY(), entity.getZ())) return false;
+
+                return this.isVisibleOrRecent(entity, config.checkVisibility);
+            } catch (e) {
+                console.error('V5 Combat Bot target scan error: ' + e);
+                return false;
+            }
+        });
+    }
+
+    getCleanEntityName(entity) {
+        return ChatLib.removeFormatting(String(entity.getName()?.getString?.() ?? entity.getName())).toLowerCase();
+    }
+
+    isVisibleOrRecent(entity, checkVisibility) {
+        if (!checkVisibility) return true;
+
+        const uuid = this.getTargetUuid(entity);
         if (!uuid) return false;
 
-        const failures = (this.failedPathCallbacks.get(uuid) || 0) + 1;
-        this.failedPathCallbacks.set(uuid, failures);
-
-        if (failures > 2) {
-            this.message('&cTarget path failed too many times. Blacklisting target for 10s.');
-            this.blacklistTarget(target, TARGET_BLACKLIST_MS);
-            this.failedPathCallbacks.delete(uuid);
+        if (this.canSeeTarget(entity)) {
+            this.visibleUntil.set(uuid, Date.now() + VISIBILITY_GRACE_MS);
             return true;
         }
 
-        return false;
-    }
-
-    tryAttack() {
-        const now = Date.now();
-        const cooldown = 1000 / this.attackCPS;
-        if (now - this.lastAttackTime < cooldown) return;
-        Client.leftClick();
-        this.lastAttackTime = now;
-    }
-
-    isTargetInvalid(target) {
-        try {
-            const entity = target.toMC ? target.toMC() : target;
-            const isDead = entity.isDeadOrDying() || entity.isRemoved();
-            if (isDead) {
-                if (this.target && target === this.target) {
-                    const pos = this.getTargetPosition(target);
-                    if (pos) this.rememberMobPosition(pos);
-                }
-                return true;
-            }
-
-            const targetUUID = this.getTargetUuid(target);
-            if (targetUUID && this.blacklistedTargets.has(targetUUID)) return true;
-
-            const pos = this.getTargetPosition(target);
-            if (pos && !this.isPositionSafe(pos.x, pos.y, pos.z)) return true;
-
-            if (!targetUUID) return !this.targets.includes(target);
-
-            return !this.targets.some((t) => this.getTargetUuid(t) === targetUUID);
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-            return true;
-        }
-    }
-
-    getDistanceToPlayer(pos) {
-        return MathUtils.getDistanceToPlayer(pos.x, pos.y, pos.z);
-    }
-
-    getDistanceBetween(pos1, pos2) {
-        return MathUtils.getDistance(pos1.x, pos1.y, pos1.z, pos2.x, pos2.y, pos2.z);
+        return (this.visibleUntil.get(uuid) || 0) > Date.now();
     }
 
     getTargets() {
-        return this.externalTargets || [];
+        const targets = this.externalTargets !== null ? this.externalTargets : this.targetNames.length ? this.findMob({ names: this.targetNames }) : [];
+        if (this.externalTargets === null) this.enabledPresets.forEach((name) => targets.push(...this.findMob(COMBAT_PRESETS[name])));
+        return [...new Map(targets.map((target) => [this.getTargetUuid(target), target])).values()].filter((target) => !this.isTargetNameBlacklisted(target));
+    }
+
+    isTargetNameBlacklisted(target) {
+        if (!this.targetNameBlacklist.length) return false;
+        try {
+            const name = this.getCleanEntityName(target);
+            return this.targetNameBlacklist.some((blocked) => name.includes(blocked));
+        } catch (e) {
+            return false;
+        }
     }
 
     setExternalTargets(targets) {
@@ -728,112 +573,102 @@ class Combat extends ModuleBase {
         this.externalTargets = null;
     }
 
-    getTargetPosition(target) {
-        if (!target) return null;
+    scanBlackholes() {
+        if (++this.scanTicker % BLACKHOLE_SCAN_INTERVAL !== 0) return;
 
-        try {
-            if (typeof target.getX === 'function') return { x: target.getX(), y: target.getY(), z: target.getZ() };
-            if (typeof target.x === 'number' && typeof target.y === 'number' && typeof target.z === 'number') {
-                return { x: target.x, y: target.y, z: target.z };
-            }
-            const entity = target.toMC ? target.toMC() : target;
-            if (entity && typeof entity.getX === 'function') return { x: entity.getX(), y: entity.getY(), z: entity.getZ() };
-        } catch (e) {
-            console.error('V5 Caught error' + e + e.stack);
-        }
+        const player = { x: Player.getX(), y: Player.getY(), z: Player.getZ() };
+        const now = Date.now();
 
-        return null;
-    }
-
-    bestTarget() {
-        if (!this.targets || this.targets.length === 0) return null;
-
-        if (this.target && !this.isTargetInvalid(this.target)) {
-            const pos = this.getTargetPosition(this.target);
-            if (pos && this.getDistanceToPlayer(pos).distance < this.targetStickinessRange) return this.target;
-        }
-
-        let lowestCost = Infinity;
-        let bestTarget = null;
-
-        this.targets.forEach((target) => {
-            if (this.isTargetInvalid(target)) return;
-            const pos = this.getTargetPosition(target);
-            if (!pos) return;
-            if (!this.isPositionSafe(pos.x, pos.y, pos.z)) return;
-
-            const distanceData = this.getDistanceToPlayer(pos);
-            const angles = MathUtils.angleToPlayer([pos.x, pos.y, pos.z]);
-            const cost = distanceData.distance * 10 + angles.distance * 0.5;
-
-            if (cost < lowestCost) {
-                lowestCost = cost;
-                bestTarget = target;
-            }
-        });
-
-        const bestUUID = this.getTargetUuid(bestTarget);
-        const currentUUID = this.getTargetUuid(this.target);
-        if (bestUUID && bestUUID === currentUUID) return this.target;
-
-        return bestTarget;
-    }
-
-    findMob(config, whitelist = null) {
-        if (!config || !config.names) {
-            console.error('Invalid mob config provided');
-            return [];
-        }
-
-        const mobs = [];
-
-        World.getAllEntities().forEach((entity) => {
+        for (const stand of World.getAllEntitiesOfType(ArmorStandEntity) || []) {
             try {
-                const nameObj = entity.getName();
-                if (!nameObj) return;
+                const position = { x: stand.getX(), y: stand.getY(), z: stand.getZ() };
+                if (
+                    Math.abs(position.x - player.x) > BLACKHOLE_SCAN_RADIUS ||
+                    Math.abs(position.y - player.y) > BLACKHOLE_SCAN_Y_RANGE ||
+                    Math.abs(position.z - player.z) > BLACKHOLE_SCAN_RADIUS ||
+                    !this.isBlackholeHead(stand.getStackInSlot(5))
+                ) {
+                    continue;
+                }
 
-                const name = ChatLib.removeFormatting(String(nameObj?.getString?.() ?? nameObj)).toLowerCase();
-                const uuid = entity.getUUID();
-                if (whitelist && whitelist.has(uuid)) return;
-                if (!config.names.some((mobName) => name.includes(mobName.toLowerCase()))) return;
-                if (entity.isSpectator?.() || entity.isInvisible() || entity.isDead()) return;
-                if (!this.isVisibleOrRecent(entity, config.checkVisibility)) return;
-
-                const x = entity.getX();
-                const y = entity.getY();
-                const z = entity.getZ();
-                if (config.boundaryCheck && !config.boundaryCheck(x, y, z)) return;
-
-                mobs.push(entity);
+                const known = this.activeBlackholes.find((blackhole) => this.getDistanceBetween(blackhole, position).distanceFlat <= BLACKHOLE_MERGE_RADIUS);
+                if (known) Object.assign(known, position, { lastSeen: now });
+                else this.activeBlackholes.push({ ...position, lastSeen: now });
             } catch (e) {
-                console.error('V5 Caught error' + e + e.stack);
+                console.error('V5 Combat Bot blackhole scan error: ' + e);
             }
+        }
+
+        this.activeBlackholes = this.activeBlackholes.filter((blackhole) => now - blackhole.lastSeen <= BLACKHOLE_MEMORY_MS);
+    }
+
+    isBlackholeHead(item) {
+        try {
+            const stack = item?.toMC ? item.toMC() : item;
+            const profile = stack?.get(net.minecraft.core.component.DataComponents.PROFILE)?.partialProfile?.()?.toString() || '';
+            if (!profile) return false;
+
+            for (const texture of BLACKHOLE_TEXTURES) {
+                if (profile.includes(texture)) return true;
+            }
+        } catch (e) {
+            console.error('V5 Combat Bot blackhole texture error: ' + e);
+        }
+        return false;
+    }
+
+    isPositionSafe(x, y, z) {
+        return this.activeBlackholes.every((blackhole) => this.getDistanceBetween({ x, y, z }, blackhole).distanceFlat >= BLACKHOLE_AVOID_RADIUS);
+    }
+
+    renderTargets() {
+        this.targets.forEach((target) => {
+            const blacklisted = this.blacklistedTargets.has(this.getTargetUuid(target));
+            if (!blacklisted && !this.isTargetUsable(target)) return;
+
+            const entity = target.toMC ? target.toMC() : target;
+            const selected = this.sameTarget(target, this.target);
+            const color = blacklisted ? new RenderColor(0, 0, 0, 150) : selected ? new RenderColor(255, 0, 0, 100) : new RenderColor(0, 70, 200, 100);
+            RenderUtils.drawHitbox(entity, color, selected ? 7 : 3, false);
         });
 
-        return mobs;
+        this.activeBlackholes.forEach((blackhole) => {
+            RenderUtils.drawFilledBox(new Vec3d(blackhole.x - 0.5, blackhole.y + 0.5, blackhole.z - 0.5), new RenderColor(0, 0, 0, 150), false);
+        });
+    }
+
+    getTargetDisplayName(target) {
+        if (!target) return 'None';
+        try {
+            return ChatLib.removeFormatting(String(target.getName?.()?.getString?.() ?? target.getName?.() ?? target.name ?? 'Unknown'));
+        } catch (e) {
+            return 'Unknown';
+        }
     }
 
     onEnable() {
         this.activeBlackholes = [];
+        this.scanTicker = 0;
+        if (!this.isParentManaged) {
+            this.message(this.targetNames.length || this.enabledPresets.size ? '&aEnabled' : '&eEnabled, but no targets are configured.');
+        }
     }
 
     onDisable() {
         if (!this.isParentManaged) this.message('&cDisabled');
 
+        this.cancelPath();
+        Client.stopMovement();
+        Rotations.stop();
         this.externalTargets = null;
         this.targets = [];
         this.target = null;
-        this.setState(COMBAT_STATE.IDLE, true);
-        this.lastPathTarget = null;
-        this.lastAttackTime = 0;
+        this.trackedTarget = null;
+        this.state = STATES.IDLE;
+        this.nextAttackAt = 0;
         this.blacklistedTargets.clear();
-        this.failedPathCallbacks.clear();
+        this.visibleUntil.clear();
         this.activeBlackholes = [];
-        this.recentVisibility.clear();
-        this.mobMemory = [];
-        this.searchTarget = null;
-        this.searchTargetSetTime = 0;
-        this.pathRequestToken = 0;
     }
 }
 

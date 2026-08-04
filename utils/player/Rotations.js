@@ -144,7 +144,10 @@ class RotationController {
         if (!this.request) return;
         if (!this.refreshTarget()) return;
 
-        if (PathRotations.rotationActive || PathFlyer.rotationActive || EtherwarpPathState.handler?.isPathing?.()) return;
+        if (PathRotations.rotationActive || PathFlyer.rotationActive || EtherwarpPathState.handler?.isPathing?.()) {
+            this.lastTime = 0;
+            return;
+        }
 
         const player = Player.getPlayer();
         if (!player || !this.targetAngles) {
@@ -202,6 +205,7 @@ class RotationController {
         const nextTarget = this.resolveTarget(nextRequest);
         if (!nextTarget) return false;
         const speedMultiplier = Number.isFinite(options?.speedMultiplier) ? options.speedMultiplier : 1;
+        const rotationSpeed = Number.isFinite(options?.rotationSpeed) && options.rotationSpeed > 0 ? options.rotationSpeed : null;
         const precision = Number.isFinite(options?.precision) && options.precision >= 0 ? options.precision : null;
 
         const sameSource = this.isSameSource(nextRequest);
@@ -214,6 +218,7 @@ class RotationController {
 
         this.request = nextRequest;
         this.request.speedMultiplier = speedMultiplier;
+        this.request.rotationSpeed = rotationSpeed;
         this.request.precision = precision;
         this.targetAngles = nextTarget;
 
@@ -290,7 +295,7 @@ class RotationController {
         const timeAlive = this.startTime > 0 ? (Date.now() - this.startTime) / 1000 : 0;
         const warmup = this.request?.type === 'angles' ? 1 : Math.min(timeAlive * 4, 1);
         const damping = Math.min(distance / RotationModule.DAMPING_DIST, 1);
-        const speed = RotationModule.ROTATION_SPEED * (this.request?.speedMultiplier ?? 1) * Math.sqrt(damping);
+        const speed = (this.request?.rotationSpeed ?? RotationModule.ROTATION_SPEED) * (this.request?.speedMultiplier ?? 1) * Math.sqrt(damping);
         const step = (speed * warmup + 10) * deltaTime;
 
         return Math.min(distance, step) / distance;

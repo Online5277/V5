@@ -33,9 +33,13 @@ class PathRotations {
         this.PREDICTION_MAX_ADVANCE_AIR = 2.4;
         this.TELEPORT_RESYNC_DURATION_TICKS = 14;
         this.TELEPORT_RESYNC_SEARCH_WINDOW = 72;
+        this.ENTITY_TRACK_DISTANCE = 8;
+        this.ENTITY_BLEND_RATE = 0.08;
         this.lookaheadOverride = null;
         this.lookaheadOverrideExpiry = 0;
         this.currentPathCurvature = 0;
+        this.entityTarget = null;
+        this.entityTrackDistance = this.ENTITY_TRACK_DISTANCE;
 
         this.resetRotations();
 
@@ -89,6 +93,10 @@ class PathRotations {
         this.lastRotationUpdate = 0;
         this.initialTurnBoostTicks = 0;
         this.postTeleportResyncTicks = 0;
+        this.entityTarget = null;
+        this.entityTrackDistance = this.ENTITY_TRACK_DISTANCE;
+        this.entityBlend = 0;
+        this.lastEntityLookPoint = null;
         PathRotationsUtility.stopRotation();
     }
 
@@ -111,7 +119,7 @@ class PathRotations {
         return this.shouldBoostInitialTurn(yawError) ? 2.0 : 1.0;
     }
 
-    isPointVisible(playerEyes, targetPoint) {
+    isPointVisible(playerEyes, targetPoint, allowEndpointCollision = true) {
         const dx = targetPoint.x - playerEyes.x();
         const dy = targetPoint.y - playerEyes.y();
         const dz = targetPoint.z - playerEyes.z();
@@ -136,7 +144,7 @@ class PathRotations {
                 },
                 true
             );
-            if (!hit) return true;
+            if (!hit || !allowEndpointCollision) return !hit;
             const hitX = hit[0] + 0.5;
             const hitY = hit[1] + 0.5;
             const hitZ = hit[2] + 0.5;
@@ -146,7 +154,7 @@ class PathRotations {
             const hitDist = Math.sqrt(hdx * hdx + hdy * hdy + hdz * hdz);
             return hitDist >= dist - 0.5;
         } catch (e) {
-            return true;
+            return allowEndpointCollision;
         }
     }
 
@@ -369,7 +377,7 @@ class PathRotations {
             this.unseenStartPathPosition = this.currentPathPosition;
         }
 
-        let targetPoint = result.point;
+        let targetPoint = this.getBlendedEntityLookPoint(result.point, playerEyes, timeScale);
         if (result.lookahead < this.smoothedLookahead) this.smoothedLookahead = this.smoothedLookahead * 0.9 + result.lookahead * 0.1;
 
         const rawDx = targetPoint.x - playerEyes.x();
@@ -405,7 +413,8 @@ class PathRotations {
 
         const lastIndex = this.boxPositions.length - 1;
         const remainingPath = lastIndex - this.currentPathPosition;
-        const finishFactor = remainingPath < 3.0 ? Math.max(0.1, remainingPath / 3.0) : 1.0;
+        const pathFinishFactor = remainingPath < 3.0 ? Math.max(0.1, remainingPath / 3.0) : 1.0;
+        const finishFactor = this.entityBlend > 0 ? Math.max(0.5, pathFinishFactor) : pathFinishFactor;
         const isStraight = this.currentPathCurvature < 0.15;
         const dynamicSmoothBase = (isStraight ? this.SMOOTH_FACTOR * 0.5 : this.SMOOTH_FACTOR) / finishFactor;
         const dynamicSmooth = 1 - Math.pow(1 - Math.min(1.0, dynamicSmoothBase * this.getInitialTurnBoostFactor(yawDelta)), timeScale);
@@ -564,7 +573,60 @@ class PathRotations {
         return (pos.x() - box.x) ** 2 + (pos.y() - box.y) ** 2 + (pos.z() - box.z) ** 2;
     }
 
-    pathRotations(splineData) {
+    getEntityLookPoint(playerEyes) {
+        if (!this.entityTarget || !this.isNearPathEnd()) return null;
+
+        try {
+            const entity = this.entityTarget.toMC ? this.entityTarget.toMC() : this.entityTarget;
+            if (!entity || entity.isRemoved?.() || entity.isDeadOrDying?.()) return null;
+
+            const box = entity.getBoundingBox?.();
+            if (!box) return null;
+
+            const x = (box.minX + box.maxX) / 2;
+            const y = box.minY + (box.maxY - box.minY) * 0.85;
+            const z = (box.minZ + box.maxZ) / 2;
+            if (Math.hypot(playerEyes.x() - x, playerEyes.y() - y, playerEyes.z() - z) > this.entityTrackDistance) return null;
+
+            const targetPoint = new Vec3d(x, y, z);
+            return this.isPointVisible(playerEyes, targetPoint, false) ? targetPoint : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    isNearPathEnd(maxRemainingNodes = 2) {
+        if (!this.boxPositions || !this.boxPositions.length) return false;
+        return this.currentPathPosition >= this.boxPositions.length - 1 - maxRemainingNodes;
+    }
+
+    getBlendedEntityLookPoint(pathPoint, playerEyes, timeScale) {
+        const entityPoint = this.getEntityLookPoint(playerEyes);
+        if (entityPoint) this.lastEntityLookPoint = entityPoint;
+
+        const targetBlend = entityPoint ? 1 : 0;
+        const blendRate = 1 - Math.pow(1 - this.ENTITY_BLEND_RATE, timeScale);
+        this.entityBlend += (targetBlend - this.entityBlend) * blendRate;
+
+        if (!this.lastEntityLookPoint || this.entityBlend < 0.001) {
+            if (!entityPoint) this.lastEntityLookPoint = null;
+            return pathPoint;
+        }
+
+        return new Vec3d(
+            pathPoint.x + (this.lastEntityLookPoint.x - pathPoint.x) * this.entityBlend,
+            pathPoint.y + (this.lastEntityLookPoint.y - pathPoint.y) * this.entityBlend,
+            pathPoint.z + (this.lastEntityLookPoint.z - pathPoint.z) * this.entityBlend
+        );
+    }
+
+    pathRotations(splineData, entityTarget = null, entityTrackDistance = this.ENTITY_TRACK_DISTANCE) {
+        if (this.entityTarget !== entityTarget) {
+            this.entityBlend = 0;
+            this.lastEntityLookPoint = null;
+        }
+        this.entityTarget = entityTarget;
+        this.entityTrackDistance = Number.isFinite(entityTrackDistance) && entityTrackDistance > 0 ? entityTrackDistance : this.ENTITY_TRACK_DISTANCE;
         if (!this.boxPositions || this.boxPositions.length < 2) {
             const lookPoints = Spline.createLookPoints(splineData, 0.25, 4.5);
             if (!lookPoints || lookPoints.length < 2) {

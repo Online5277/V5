@@ -26,6 +26,11 @@ class Finder {
         this.currentEnd = null;
         this.currentCallback = null;
         this.walkArrivalRadius = 2;
+        this.entityTarget = null;
+        this.entityTargetResolver = null;
+        this.entityGoalOffsets = null;
+        this.entityTrackDistance = 8;
+        this.silent = false;
         this.recalculateAttempts = 0;
         this.recalculateRetryQueued = false;
         this.MAX_RECALCULATE_ATTEMPTS = 9;
@@ -111,17 +116,33 @@ class Finder {
     }
 
     findPath(end, onComplete, isFly = false, startPoints = null, preserveRecalculateAttempts = false, walkArrivalRadius = 2) {
+        const options = typeof isFly === 'object' && isFly !== null ? isFly : null;
+        if (options) {
+            isFly = options.isFly === true;
+            startPoints = options.startPoints || null;
+            preserveRecalculateAttempts = options.preserveRecalculateAttempts === true;
+            walkArrivalRadius = options.walkArrivalRadius ?? 2;
+        }
+
         this.recalculateScheduleId++;
         this.currentEnd = end;
         this.currentStarts = startPoints;
         this.currentCallback = onComplete;
         this.isFly = isFly;
         this.walkArrivalRadius = Number.isFinite(walkArrivalRadius) && walkArrivalRadius > 0 ? walkArrivalRadius : 2;
+        if (!preserveRecalculateAttempts) {
+            this.entityTarget = options?.entityTarget || null;
+            this.entityTargetResolver = typeof options?.resolveEntityTarget === 'function' ? options.resolveEntityTarget : null;
+            this.entityGoalOffsets = this.createEntityGoalOffsets(end, this.entityTarget);
+            this.entityTrackDistance = Number.isFinite(options?.entityTrackDistance) && options.entityTrackDistance > 0 ? options.entityTrackDistance : 8;
+            this.silent = options?.silent === true;
+            this.addAvoidPoints(options?.avoidPoints, options?.avoidRadius);
+        }
         this.clearPathCaches();
 
         const { points: starts, metadata: startMetadata } = this.createStartPoints(startPoints);
         if (!starts?.length) {
-            showNotification('Pathfinding Failed', 'No valid start points were provided.', 'ERROR', 5000);
+            if (!this.silent) showNotification('Pathfinding Failed', 'No valid start points were provided.', 'ERROR', 5000);
             this.callCallback(false);
             return;
         }
@@ -147,7 +168,7 @@ class Finder {
         }
 
         if (!Swift.SwiftPath(starts, end, isFly, this.pathVariantSeed, PathConfig.PATHFINDER_MAX_COMPUTE)) {
-            showNotification('Pathfinding Failed', Swift.getLastError() || 'Failed to start', 'ERROR', 5000);
+            if (!this.silent) showNotification('Pathfinding Failed', Swift.getLastError() || 'Failed to start', 'ERROR', 5000);
             this.callCallback(false);
             return;
         }
@@ -186,8 +207,14 @@ class Finder {
                 }
             }
 
+            if (result && this.entityTargetResolver && !this.resolveEntityTarget(result)) {
+                this.callCallback(false);
+                this.resetPath();
+                return;
+            }
+
             if (!result || !result.keynodes?.length) {
-                if (this.checkIfReachedDestination()) {
+                if (!this.entityTargetResolver && this.checkIfReachedDestination()) {
                     this.finishSuccess();
                 } else {
                     if (this.recalculateAttempts > 0 && !this.recalculateRetryQueued) {
@@ -197,7 +224,7 @@ class Finder {
                     }
 
                     const reason = Swift.getLastError();
-                    Chat.messagePathfinder('§cNo path found' + (reason ? ': ' + reason : ''));
+                    if (!this.silent) Chat.messagePathfinder('§cNo path found' + (reason ? ': ' + reason : ''));
 
                     this.callCallback(false);
                     this.resetPath();
@@ -232,12 +259,12 @@ class Finder {
 
                 if (!splinePath?.length) return;
 
-                if (Rotations.boxPositions?.length && Rotations.complete) {
+                if (Rotations.boxPositions && Rotations.boxPositions.length && Rotations.complete) {
                     this.checkIfReachedDestination() ? this.finishSuccess() : this.recalculate('rotation_complete_not_at_goal');
                     return;
                 }
 
-                Rotations.pathRotations(splinePath);
+                Rotations.pathRotations(splinePath, this.entityTarget, this.entityTrackDistance);
                 this.applyPathRuntimeHints(result);
                 Aote.onPathTick(Rotations);
                 Jump.detectJump(result.path_between_key_nodes, result.path_flags, result.path_flag_bits);
@@ -423,6 +450,52 @@ class Finder {
         });
     }
 
+    addAvoidPoints(points, radius = 2) {
+        if (!Array.isArray(points)) return;
+
+        points.forEach((point) => {
+            if (!point) return;
+            const x = Array.isArray(point) ? point[0] : point.x;
+            const y = Array.isArray(point) ? point[1] : point.y;
+            const z = Array.isArray(point) ? point[2] : point.z;
+            Swift.addTransientAvoidPoint(x, y, z, radius, 1000, this.MAX_RECALCULATE_ATTEMPTS + 2);
+        });
+    }
+
+    createEntityGoalOffsets(goals, target) {
+        const position = this.getEntityPosition(target);
+        if (!position || !Array.isArray(goals)) return null;
+
+        const anchor = [Math.floor(position.x), Math.floor(position.y), Math.floor(position.z)];
+        return goals.map((goal) => [goal[0] - anchor[0], goal[1] - anchor[1], goal[2] - anchor[2]]);
+    }
+
+    getEntityGoals() {
+        const position = this.getEntityPosition(this.entityTarget);
+        if (!position || !this.entityGoalOffsets) return null;
+
+        const anchor = [Math.floor(position.x), Math.floor(position.y), Math.floor(position.z)];
+        return this.entityGoalOffsets.map((offset) => [anchor[0] + offset[0], anchor[1] + offset[1], anchor[2] + offset[2]]);
+    }
+
+    resolveEntityTarget(result) {
+        const resolver = this.entityTargetResolver;
+        this.entityTargetResolver = null;
+
+        try {
+            const resolved = resolver(result);
+            if (!resolved || !resolved.target || !Array.isArray(resolved.goals) || !resolved.goals.length) return false;
+
+            this.entityTarget = resolved.target;
+            this.currentEnd = resolved.goals;
+            this.entityGoalOffsets = this.createEntityGoalOffsets(resolved.goals, resolved.target);
+            return true;
+        } catch (e) {
+            console.error('Path entity target resolver error: ' + e);
+            return false;
+        }
+    }
+
     applyPathRuntimeHints(result) {
         if (!result || this.isFly || Recovery.isStallRecoveryActive()) return;
         if (!Array.isArray(result.path_flags) || !result.path_flags.length) return;
@@ -452,12 +525,15 @@ class Finder {
     }
 
     schedulePathRetry(delay) {
-        const end = this.currentEnd;
+        const end = this.getEntityGoals() || this.currentEnd;
         const starts = this.currentStarts;
         const callback = this.currentCallback;
         const wasFromFile = this.calledFromFile;
         const attempts = this.recalculateAttempts;
         const walkArrivalRadius = this.walkArrivalRadius;
+        const entityTarget = this.entityTarget;
+        const entityTrackDistance = this.entityTrackDistance;
+        const silent = this.silent;
         const scheduleId = ++this.recalculateScheduleId;
 
         this.resetPath(false);
@@ -473,7 +549,15 @@ class Finder {
             this.calledFromFile = wasFromFile;
             this.recalculateAttempts = attempts;
 
-            this.findPath(end, callback, this.isFly, starts, true, walkArrivalRadius);
+            this.findPath(end, callback, {
+                isFly: this.isFly,
+                startPoints: starts,
+                preserveRecalculateAttempts: true,
+                walkArrivalRadius,
+                entityTarget,
+                entityTrackDistance,
+                silent,
+            });
         });
     }
 
@@ -486,6 +570,16 @@ class Finder {
         const pX = Player.getX(),
             pY = Player.getY(),
             pZ = Player.getZ();
+
+        const entityPosition = this.getEntityPosition(this.entityTarget);
+        if (entityPosition) {
+            return (
+                Math.hypot(pX - entityPosition.x, pZ - entityPosition.z) <= this.walkArrivalRadius &&
+                Math.abs(pY - entityPosition.y) <= 2.5 &&
+                Rotations.getEntityLookPoint(player.getEyePosition()) !== null
+            );
+        }
+
         const goals = this.currentEnd;
 
         for (const goal of goals) {
@@ -515,8 +609,20 @@ class Finder {
         return false;
     }
 
+    getEntityPosition(target) {
+        if (!target) return null;
+
+        try {
+            const entity = target.toMC ? target.toMC() : target;
+            if (!entity || entity.isRemoved?.() || entity.isDeadOrDying?.()) return null;
+            return { x: entity.getX(), y: entity.getY(), z: entity.getZ() };
+        } catch (e) {
+            return null;
+        }
+    }
+
     finishSuccess() {
-        showNotification('Path Complete', 'Destination reached!', 'SUCCESS', 2000);
+        if (!this.silent) showNotification('Path Complete', 'Destination reached!', 'SUCCESS', 2000);
         this.callCallback(true);
         this.resetPath();
     }
@@ -904,6 +1010,11 @@ class Finder {
             this.currentEnd = null;
             this.currentStarts = null;
             this.currentCallback = null;
+            this.entityTarget = null;
+            this.entityTargetResolver = null;
+            this.entityGoalOffsets = null;
+            this.entityTrackDistance = 8;
+            this.silent = false;
             this.recalculateAttempts = 0;
             this.recalculateRetryQueued = false;
             this.pathVariantSeed = 0;
