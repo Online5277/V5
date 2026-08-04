@@ -5,7 +5,6 @@ import { NukerUtils } from '../../utils/NukerUtils';
 import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 import { Executor } from '../../utils/ThreadExecutor';
-import { Utils } from '../../utils/Utils';
 
 const TARGET_TYPE = new BlockType('minecraft:flowering_azalea');
 const TARGET_BLACKLIST_MS = 5000;
@@ -49,14 +48,15 @@ class LushLilacEtherwarpNuker extends ModuleBase {
             { sessionTrackedValues: { blocksNuked: 0 } }
         );
         this.on('tick', () => this.tick());
+        this.on('actionBar', (text) => {
+            if (!this.enabled || this.rewarping || !ChatLib.removeFormatting(text).includes('NOT ENOUGH MANA')) return;
+            this.rewarp('Not enough mana.');
+        }).setCriteria('${text}');
         this.on('worldUnload', () => this.onWorldUnload());
     }
 
     tick() {
         if (this.rewarping || !World.isLoaded()) return;
-
-        const mana = Utils.getCurrentMana();
-        if (mana !== null && mana < 100) return this.rewarp();
 
         this.refreshTargets();
         if (this.pathing || EtherwarpPathfinder.isPathing()) return;

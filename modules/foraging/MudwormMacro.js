@@ -37,8 +37,6 @@ class MudwormMacro extends ModuleBase {
         this.waitingForEntities = false;
         this.waitingForGalateaWorld = false;
         this.lastGalateaWarpAt = 0;
-        this.actionToken = 0;
-        this.rewarpToken = 0;
         this.currentTarget = null;
         this.targetStartedAt = 0;
         this.fallbackChecked = false;
@@ -109,13 +107,12 @@ class MudwormMacro extends ModuleBase {
         this.targetStartedAt = Date.now();
         this.fallbackChecked = false;
         this.fallbackWaitUntil = 0;
-        const token = ++this.actionToken;
         const started = EtherwarpPathfinder.findPath(target, {
             silent: true,
-            onSuccess: () => this.clickTarget(target, token),
-            onFail: () => this.finishTarget(target, token),
+            onSuccess: () => this.clickTarget(target),
+            onFail: () => this.finishTarget(target),
         });
-        if (!started) this.finishTarget(target, token);
+        if (!started) this.finishTarget(target);
     }
 
     getTargets() {
@@ -133,20 +130,16 @@ class MudwormMacro extends ModuleBase {
         return targets;
     }
 
-    clickTarget(target, token) {
-        if (!this.isCurrentAction(token)) return;
-
-        if (!Rotations.lookAtAngles(Player.getYaw(), 90, { speedMultiplier: 999 })) return this.finishTarget(target, token);
-        Rotations.onComplete(() => {
-            if (!this.isCurrentAction(token)) return;
+    clickTarget(target) {
+        Rotations.lookAtAngles(Player.getYaw(), 90, { speedMultiplier: 420691337161 });
+        ScheduleTask(1, () => {
             Client.leftClick();
             OverlayManager.incrementTrackedValue(this.oid, 'clicks');
-            this.finishTarget(target, token);
-        }, 'mudworm_macro_click');
+            this.finishTarget(target);
+        });
     }
 
-    finishTarget(target, token) {
-        if (token !== this.actionToken) return;
+    finishTarget(target) {
         this.processedTargets.add(target.key);
         this.currentTarget = null;
         this.targetStartedAt = 0;
@@ -162,31 +155,24 @@ class MudwormMacro extends ModuleBase {
     checkFallback() {
         this.busy = true;
         this.checkingFallback = true;
-        const token = ++this.actionToken;
         const started = EtherwarpPathfinder.findPath(FALLBACK_TARGET, {
             silent: true,
-            onSuccess: () => this.finishFallback(token),
-            onFail: () => this.failFallback(token),
+            onSuccess: () => this.finishFallback(),
+            onFail: () => this.failFallback(),
         });
-        if (!started) this.failFallback(token);
+        if (!started) this.failFallback();
     }
 
-    finishFallback(token) {
-        if (!this.isCurrentAction(token)) return;
+    finishFallback() {
         this.busy = false;
         this.checkingFallback = false;
         this.fallbackChecked = true;
         this.fallbackWaitUntil = Date.now() + FALLBACK_WAIT_MS;
     }
 
-    failFallback(token) {
-        if (!this.isCurrentAction(token)) return;
-        if (this.autoRewarp === 'Disabled') return this.finishFallback(token);
+    failFallback() {
+        if (this.autoRewarp === 'Disabled') return this.finishFallback();
         this.rewarp('Fallback etherwarp failed.');
-    }
-
-    isCurrentAction(token) {
-        return this.enabled && !this.rewarping && token === this.actionToken;
     }
 
     trackShards(event) {
@@ -217,9 +203,8 @@ class MudwormMacro extends ModuleBase {
     onWorldLoad() {
         if (!this.waitingForEntities) return;
 
-        const token = this.rewarpToken;
         ScheduleTask(ENTITY_LOAD_WAIT_TICKS, () => {
-            if (!this.enabled || token !== this.rewarpToken || !this.waitingForEntities) return;
+            if (!this.enabled || !this.waitingForEntities) return;
             this.waitingForEntities = false;
             this.message('&aResumed.');
         });
@@ -236,19 +221,18 @@ class MudwormMacro extends ModuleBase {
         this.fallbackWaitUntil = 0;
         this.checkingFallback = false;
         this.stopCurrentAction();
-        const token = ++this.rewarpToken;
         const destination = this.autoRewarp === 'Warp Torrhus' ? 'torrhus' : 'galatea';
 
         this.message(`&e${reason} Rewarping...`);
         const runHubWarp = () => {
-            if (!this.enabled || token !== this.rewarpToken) return;
+            if (!this.enabled) return;
 
             const remainingMs = this.lastGalateaWarpAt + GALATEA_HUB_DELAY_MS - Date.now();
             if (remainingMs > 0) return ScheduleTask(Math.ceil(remainingMs / 50), runHubWarp);
 
             ChatLib.command('warp hub');
             ScheduleTask(100, () => {
-                if (!this.enabled || token !== this.rewarpToken) return;
+                if (!this.enabled) return;
                 this.waitingForGalateaWorld = true;
                 this.lastGalateaWarpAt = Date.now();
                 ChatLib.command(`warp ${destination}`);
@@ -262,7 +246,6 @@ class MudwormMacro extends ModuleBase {
     }
 
     stopCurrentAction() {
-        this.actionToken++;
         if (this.busy && EtherwarpPathfinder.isPathing()) EtherwarpPathfinder.cancel(true);
         if (this.busy) Rotations.stop();
         this.currentTarget = null;
@@ -275,7 +258,6 @@ class MudwormMacro extends ModuleBase {
     }
 
     onDisable() {
-        this.rewarpToken++;
         this.rewarping = false;
         this.waitingForEntities = false;
         this.waitingForGalateaWorld = false;

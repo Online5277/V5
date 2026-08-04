@@ -6,7 +6,6 @@ import { finiteNumber } from '../NumberUtils';
 import { RotationGCD } from '../player/RotationGCD';
 import { ServerInfo } from '../player/ServerInfo';
 import { ScheduleTask } from '../ScheduleTask';
-import { Utils } from '../Utils';
 import { v5Command } from '../V5Commands';
 import { EtherwarpPathState } from '../Etherwarp';
 
@@ -26,8 +25,6 @@ const PATH_COLORS = {
     start: new RenderColor(80, 255, 140, 180),
     end: new RenderColor(255, 90, 90, 180),
 };
-
-const MINIMUM_MANA = 100;
 
 const readPathPoints = (pathArr) => {
     if (!pathArr || typeof pathArr.length !== 'number') return [];
@@ -69,6 +66,10 @@ class EtherwarpPathHandler {
         }).setFps(100);
         register('renderWorld', () => this.render());
         register('packetReceived', () => this.onCommonPingPacket()).setFilteredClass(ClientboundPingPacket);
+        register('actionBar', (text) => {
+            if (!this.executionActive || !ChatLib.removeFormatting(text).includes('NOT ENOUGH MANA')) return;
+            this.finishFailure('Not enough mana to continue etherwarping.', !this.currentRun || this.currentRun.restoreSlot !== false);
+        }).setCriteria('${text}');
         register('worldUnload', () => this.handleWorldUnload());
     }
 
@@ -419,12 +420,6 @@ class EtherwarpPathHandler {
         if (!this.isExecutionContextValid(token)) return;
         if (!World.isLoaded()) {
             this.finishFailure('World unloaded during etherwarp.', false);
-            return;
-        }
-
-        const mana = Utils.getCurrentMana();
-        if (mana !== null && mana < MINIMUM_MANA) {
-            this.finishFailure('Not enough mana to continue etherwarping.', !this.currentRun || this.currentRun.restoreSlot !== false);
             return;
         }
 
