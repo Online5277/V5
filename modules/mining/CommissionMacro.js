@@ -548,6 +548,7 @@ class CommissionMacro extends ModuleBase {
             };
             const started = FastEtherwarp.findPath(waypoints, {
                 silent: true,
+                restoreSlot: false,
                 onSuccess: () => this.onPathComplete(true),
                 onFail: fallback,
             });
