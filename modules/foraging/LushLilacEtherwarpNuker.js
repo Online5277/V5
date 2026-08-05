@@ -2,7 +2,7 @@ import { OverlayManager } from '../../gui/OverlayUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { MacroState } from '../../utils/MacroState';
 import { NukerUtils } from '../../utils/NukerUtils';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { EtherwarpPathfinder } from '../../utils/FastEtherwarp';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 import { Executor } from '../../utils/ThreadExecutor';
 

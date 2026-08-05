@@ -1,11 +1,11 @@
 import { MathUtils } from './Math';
-import { EtherwarpPathfinder } from './pathfinder/EtherwarpPathfinder';
+import { FastEtherwarp } from './FastEtherwarp';
 import Pathfinder from './pathfinder/PathFinder';
 import { Guis } from './player/Inventory';
 import { Rotations } from './player/Rotations';
 
 export class CommissionClaimer {
-    constructor({ getLocations, ensureToolEquipped, isClaiming, delay, onClaimsExhausted, onPathStart, onPathFailed, canInteract, useEtherwarp }) {
+    constructor({ getLocations, ensureToolEquipped, isClaiming, delay, onClaimsExhausted, onPathStart, onPathFailed, canInteract, getTravelMode }) {
         this.getLocations = getLocations;
         this.ensureToolEquipped = ensureToolEquipped;
         this.isClaiming = isClaiming;
@@ -14,7 +14,7 @@ export class CommissionClaimer {
         this.onPathStart = onPathStart || (() => {});
         this.onPathFailed = onPathFailed || (() => {});
         this.canInteract = canInteract || (() => true);
-        this.useEtherwarp = useEtherwarp || (() => false);
+        this.getTravelMode = getTravelMode || (() => 'Walk');
         this.npcRotationPending = false;
         this.npcRotationToken = 0;
     }
@@ -91,7 +91,8 @@ export class CommissionClaimer {
                 if (!success) this.onPathFailed();
             });
         };
-        if (!this.useEtherwarp()) {
+        const travelMode = this.getTravelMode();
+        if (travelMode === 'Walk') {
             walk();
             return;
         }
@@ -102,7 +103,7 @@ export class CommissionClaimer {
             walking = true;
             walk();
         };
-        const started = EtherwarpPathfinder.findPath(locations, {
+        const started = FastEtherwarp.findPath(locations, {
             silent: true,
             goalRadius: 2,
             onSuccess: fallback,
@@ -112,7 +113,7 @@ export class CommissionClaimer {
     }
 
     isPathing() {
-        return Pathfinder.isPathing() || EtherwarpPathfinder.isPathing();
+        return Pathfinder.isPathing() || FastEtherwarp.isPathing();
     }
 
     getClosestLocation(locations) {

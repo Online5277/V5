@@ -6,7 +6,7 @@ import { MacroState } from '../../utils/MacroState';
 import { MiningUtils } from '../../utils/MiningUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { finiteNumber } from '../../utils/NumberUtils';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { FastEtherwarp } from '../../utils/FastEtherwarp';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
 import { Guis } from '../../utils/player/Inventory';
 import { manager } from '../../utils/SkyblockEvents';
@@ -28,7 +28,7 @@ const STATES = {
     REFUELING: 'Refueling Drill',
     CLAIMING: 'Claiming Rewards',
 };
-const TRAVEL_MODES = ['Walk', 'Etherwarp'];
+const TRAVEL_MODES = ['Walk', 'Fast Etherwarp'];
 
 class CommissionMacro extends ModuleBase {
     constructor() {
@@ -86,7 +86,7 @@ class CommissionMacro extends ModuleBase {
             },
             onPathFailed: () => this.setState(STATES.CHOOSING),
             canInteract: () => !this.emissariesUnlocked || this.checkEmissaryUnlocked(),
-            useEtherwarp: () => this.travelMode === 'Etherwarp',
+            getTravelMode: () => this.travelMode,
         });
 
         this.addMultiToggle(
@@ -314,7 +314,7 @@ class CommissionMacro extends ModuleBase {
         MiningBot.toggle(false, true);
         CombatBot.clearExternalTargets();
         CombatBot.toggle(false);
-        EtherwarpPathfinder.cancel(true);
+        FastEtherwarp.cancel(true);
         Pathfinder.resetPath(true);
     }
 
@@ -539,14 +539,14 @@ class CommissionMacro extends ModuleBase {
         this.currentPathWaypoints = waypoints.slice();
         this.currentPathWaypoint = this.getClosestWaypoint(waypoints);
         this.setState(STATES.TRAVELING);
-        if (this.travelMode === 'Etherwarp') {
+        if (this.travelMode !== 'Walk') {
             let walking = false;
             const fallback = () => {
                 if (walking || this.currentState !== STATES.TRAVELING) return;
                 walking = true;
                 Pathfinder.findPath(waypoints, (success) => this.onPathComplete(success));
             };
-            const started = EtherwarpPathfinder.findPath(waypoints, {
+            const started = FastEtherwarp.findPath(waypoints, {
                 silent: true,
                 onSuccess: () => this.onPathComplete(true),
                 onFail: fallback,
@@ -894,7 +894,7 @@ class CommissionMacro extends ModuleBase {
     onCommissionComplete() {
         if (this.currentState === STATES.REFUELING) return;
 
-        EtherwarpPathfinder.cancel(true);
+        FastEtherwarp.cancel(true);
         Pathfinder.resetPath();
         MiningBot.toggle(false, true);
 

@@ -6,7 +6,7 @@ import { formatRoundedNumber } from '../../utils/NumberUtils';
 import { ServerboundUseItemPacket } from '../../utils/Packets';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { EtherwarpPathfinder } from '../../utils/FastEtherwarp';
 import { PathExecutor } from '../../utils/pathfinder/PathExecutor';
 import { MathUtils } from '../../utils/Math';
 import { Utils } from '../../utils/Utils';

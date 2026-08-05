@@ -22,7 +22,7 @@ import './modules/other/MacroScheduler';
 import './modules/other/MacroControllers';
 import './modules/other/DiscordIntegration';
 import './utils/pathfinder/PathFinder';
-import './utils/pathfinder/EtherwarpPathfinder';
+import './utils/FastEtherwarp';
 import './utils/Misc';
 import './utils/SkyblockItemUtil';
 import './failsafes/FailsafeManager';

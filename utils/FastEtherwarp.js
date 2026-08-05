@@ -1,13 +1,13 @@
-import { Chat } from '../Chat';
-import { MCHand, Vec3d } from '../Constants';
-import { ClientboundPingPacket, ServerboundUseItemPacket } from '../Packets';
-import { Guis } from '../player/Inventory';
-import { finiteNumber } from '../NumberUtils';
-import { RotationGCD } from '../player/RotationGCD';
-import { ServerInfo } from '../player/ServerInfo';
-import { ScheduleTask } from '../ScheduleTask';
-import { v5Command } from '../V5Commands';
-import { EtherwarpPathState } from '../Etherwarp';
+import { Chat } from './Chat';
+import { MCHand, Vec3d } from './Constants';
+import { EtherwarpPathState, getEtherwarpBlockShape, isAtEtherwarpLanding } from './Etherwarp';
+import { finiteNumber } from './NumberUtils';
+import { ServerboundUseItemPacket } from './Packets';
+import { Guis } from './player/Inventory';
+import { RotationGCD } from './player/RotationGCD';
+import { ServerInfo } from './player/ServerInfo';
+import { ScheduleTask } from './ScheduleTask';
+import { v5Command } from './V5Commands';
 
 const SEARCH_OPTIONS = {
     maxIterations: 100000,
@@ -65,7 +65,6 @@ class EtherwarpPathHandler {
             this.pollExecutionWait();
         }).setFps(100);
         register('renderWorld', () => this.render());
-        register('packetReceived', () => this.onCommonPingPacket()).setFilteredClass(ClientboundPingPacket);
         register('actionBar', (text) => {
             if (!this.executionActive || !ChatLib.removeFormatting(text).includes('NOT ENOUGH MANA')) return;
             this.finishFailure('Not enough mana to continue etherwarping.', !this.currentRun || this.currentRun.restoreSlot !== false);
@@ -83,18 +82,13 @@ class EtherwarpPathHandler {
         this.angles = [];
         this.currentGoal = null;
         this.currentRun = null;
-        this.commonPingPacketCount = 0;
         this.resetExecutionRuntime();
     }
 
     resetExecutionRuntime() {
-        this.hopWaitStartedAt = 0;
-        this.hopSoftDeadlineAt = 0;
         this.hopHardDeadlineAt = 0;
         this.hopAwaiting = false;
-        this.hopRequiredPingPackets = 0;
-        this.hopPingStartCount = 0;
-        this.finalNode = null;
+        this.hopIndex = -1;
     }
 
     test(xArg, yArg, zArg) {
@@ -111,7 +105,6 @@ class EtherwarpPathHandler {
     }
 
     resolveClosestGoal(goal, radius = 0) {
-        if (!Array.isArray(goal) && radius <= 0) return goal;
         const candidates = Array.isArray(goal) && (Array.isArray(goal[0]) || typeof goal[0] === 'object') ? goal : [goal];
         const sortOrigin = this.getPlayerSupportBlock() || { x: Player.getX(), y: Player.getY(), z: Player.getZ() };
         const closest = candidates.reduce((best, candidate) => {
@@ -121,12 +114,18 @@ class EtherwarpPathHandler {
 
             let landing = { x, y, z };
             if (!PathManager.isValidEtherwarpLanding(x, y, z)) {
-                const result = radius > 0 && PathManager.getEtherwarpLandingCandidates(x, y, z, radius, radius, sortOrigin.x, sortOrigin.y, sortOrigin.z);
-                if (!result?.goals || result.goals.length < 3) return best;
-                landing = { x: result.goals[0], y: result.goals[1], z: result.goals[2] };
+                const aboveIsSnow = World.getBlockAt(x, y + 1, z)?.type?.getRegistryName?.() === 'minecraft:snow';
+                if (aboveIsSnow && PathManager.isValidEtherwarpLanding(x, y + 1, z)) {
+                    landing.y++;
+                } else {
+                    const result = radius > 0 && PathManager.getEtherwarpLandingCandidates(x, y, z, radius, radius, sortOrigin.x, sortOrigin.y, sortOrigin.z);
+                    if (!result?.goals || result.goals.length < 3) return best;
+                    landing = { x: result.goals[0], y: result.goals[1], z: result.goals[2] };
+                }
             }
 
-            const distance = Math.hypot(Player.getX() - landing.x, Player.getY() - landing.y, Player.getZ() - landing.z);
+            const center = PathManager.getEtherwarpLandingCenter(landing.x, landing.y, landing.z) || [landing.x + 0.5, landing.y + 1, landing.z + 0.5];
+            const distance = Math.hypot(Player.getX() - center[0], Player.getY() - center[1], Player.getZ() - center[2]);
             return !best || distance < best.distance ? { goal: landing, distance } : best;
         }, null);
         return closest?.goal || null;
@@ -137,6 +136,11 @@ class EtherwarpPathHandler {
         if (!goal || ![goal.x, goal.y, goal.z].every(Number.isFinite)) {
             Chat.messagePathfinder('&cInvalid etherwarp coordinates.');
             return false;
+        }
+        if (this.isAtNode(goal)) {
+            this.cancel(options.restoreSlot !== false);
+            if (typeof options.onSuccess === 'function') ScheduleTask(() => options.onSuccess(goal));
+            return true;
         }
         const slot = this.getEtherwarpSlot();
         if (slot < 0) {
@@ -181,7 +185,6 @@ class EtherwarpPathHandler {
         this.angles = [];
         this.currentGoal = null;
         this.currentRun = null;
-        this.finalNode = null;
     }
 
     isPathing() {
@@ -226,20 +229,7 @@ class EtherwarpPathHandler {
     }
 
     isAtNode(node) {
-        if (!this.isNodeValid(node)) return false;
-        if (!Player.getPlayer()) return false;
-
-        const px = Number(Player.getX());
-        const py = Number(Player.getY());
-        const pz = Number(Player.getZ());
-        if (![px, py, pz].every(Number.isFinite)) return false;
-
-        const sameX = Math.floor(px) === Math.floor(node.x);
-        const sameZ = Math.floor(pz) === Math.floor(node.z);
-        if (!sameX || !sameZ) return false;
-
-        const yDelta = py - Number(node.y);
-        return yDelta >= -2 && yDelta <= 3;
+        return this.isNodeValid(node) && isAtEtherwarpLanding(node);
     }
 
     validatePathData() {
@@ -264,7 +254,6 @@ class EtherwarpPathHandler {
 
         this.path = [];
         this.angles = [];
-        this.finalNode = null;
         this.preparePlayer(slot);
 
         const started = PathManager.findEtherwarpPath(
@@ -300,7 +289,6 @@ class EtherwarpPathHandler {
         PathManager.clear();
         this.path = [];
         this.angles = [];
-        this.finalNode = null;
         this.stopExecution(false, true);
     }
 
@@ -352,7 +340,6 @@ class EtherwarpPathHandler {
 
         this.path = readPathPoints(PathManager.getEtherwarpPathArray());
         this.angles = readAngles(PathManager.getEtherwarpAnglesArray());
-        this.finalNode = this.path.length ? this.path[this.path.length - 1] : null;
         const timeMs = Number(PathManager.getEtherwarpLastTimeMs());
         const nodeCount = this.path.length;
 
@@ -396,7 +383,6 @@ class EtherwarpPathHandler {
         this.executionActive = true;
         this.executionToken++;
         this.resetExecutionRuntime();
-        this.finalNode = this.path.length ? this.path[this.path.length - 1] : null;
 
         this.preparePlayer(slot);
         ScheduleTask(2, () => this.executePath(this.executionToken));
@@ -433,68 +419,48 @@ class EtherwarpPathHandler {
         RotationGCD.applyToPlayer(angles.yaw, angles.pitch);
         this.sendEtherwarpClick();
         if (index >= this.path.length - 1) {
-            this.startAwaitingFinalArrival(token);
+            this.startAwaitingHop(token, index);
             return;
         }
-
-        const nextIndex = index + 1;
-        ScheduleTask(1, () => {
-            if (this.currentRun === null) return;
-            this.executeHop(token, nextIndex);
-        });
+        ScheduleTask(1, () => this.executeHop(token, index + 1));
     }
 
-    startAwaitingFinalArrival(token) {
+    startAwaitingHop(token, index) {
         const now = Date.now();
         const estimatedTickDelay = this.getPingDelayTicks();
         const estimatedTickDelayMs = estimatedTickDelay * 50;
 
+        this.hopIndex = index;
         this.hopAwaiting = true;
-        this.hopWaitStartedAt = now;
-        this.hopSoftDeadlineAt = now + estimatedTickDelayMs;
-        this.hopHardDeadlineAt = Math.max(now + 200, this.hopSoftDeadlineAt + 800);
-        this.hopRequiredPingPackets = estimatedTickDelay;
-        this.hopPingStartCount = this.commonPingPacketCount;
+        this.hopHardDeadlineAt = Math.max(now + 1500, now + estimatedTickDelayMs + 1000);
 
-        this.evaluateFinalArrival(token);
-    }
-
-    onCommonPingPacket() {
-        this.commonPingPacketCount++;
-        if (!this.hopAwaiting || !this.executionActive) return;
-        this.evaluateFinalArrival(this.executionToken);
+        this.evaluateHopArrival(token);
     }
 
     pollExecutionWait() {
         if (!this.hopAwaiting || !this.executionActive) return;
-        this.evaluateFinalArrival(this.executionToken);
+        this.evaluateHopArrival(this.executionToken);
     }
 
-    evaluateFinalArrival(token) {
+    evaluateHopArrival(token) {
         if (!this.isExecutionContextValid(token)) return;
         if (!this.hopAwaiting) return;
 
-        const finalNode = this.finalNode || (this.path.length ? this.path[this.path.length - 1] : null);
-        if (!this.isNodeValid(finalNode)) {
-            this.finishFailure('Etherpath execution encountered malformed final node data.', !this.currentRun || this.currentRun.restoreSlot !== false);
+        const node = this.path[this.hopIndex];
+        if (!this.isNodeValid(node)) {
+            this.finishFailure('Etherpath execution encountered malformed hop data.', !this.currentRun || this.currentRun.restoreSlot !== false);
             return;
         }
 
-        if (this.isAtNode(finalNode)) {
+        if (this.isAtNode(node)) {
             this.hopAwaiting = false;
             this.messagePathfinder('&aEtherpath complete.');
             this.finishSuccess();
             return;
         }
 
-        const observedPackets = this.commonPingPacketCount - this.hopPingStartCount;
-        if (observedPackets >= this.hopRequiredPingPackets && Date.now() >= this.hopSoftDeadlineAt) {
-            this.retryPath('Etherpath final destination arrival timeout.');
-            return;
-        }
-
         if (Date.now() >= this.hopHardDeadlineAt) {
-            this.retryPath('Etherpath final destination arrival timeout.');
+            this.retryPath(`Etherpath hop ${this.hopIndex + 1} arrival timeout.`);
         }
     }
 
@@ -515,7 +481,6 @@ class EtherwarpPathHandler {
         this.hopAwaiting = false;
         this.resetExecutionRuntime();
         this.originalSlot = preserveOriginalSlot ? currentOriginalSlot : -1;
-
         if (!hasPreparedState) return;
 
         ScheduleTask(0, () => {
@@ -530,8 +495,7 @@ class EtherwarpPathHandler {
 
     getEtherwarpSlot() {
         const aotv = Guis.findItemInHotbar('Aspect of the Void');
-        if (aotv !== -1) return aotv;
-        return Guis.findItemInHotbar('Aspect of the End');
+        return aotv !== -1 ? aotv : Guis.findItemInHotbar('Aspect of the End');
     }
 
     ensureEtherwarpHeld(token, resumeTask) {
@@ -555,16 +519,36 @@ class EtherwarpPathHandler {
 
         for (let i = 0; i < this.path.length; i++) {
             const point = this.path[i];
-            const pointVec = new Vec3d(point.x, point.y, point.z);
-            const centerVec = new Vec3d(point.x + 0.5, point.y + 1.05, point.z + 0.5);
             const boxColor = i === 0 ? PATH_COLORS.start : i === this.path.length - 1 ? PATH_COLORS.end : PATH_COLORS.pending;
+            const shape = getEtherwarpBlockShape(point);
+            const boxes = shape?.toAabbs?.();
+            const bounds = shape?.bounds?.();
+            const centerVec = bounds
+                ? new Vec3d(point.x + (bounds.minX + bounds.maxX) / 2, point.y + (bounds.minY + bounds.maxY) / 2, point.z + (bounds.minZ + bounds.maxZ) / 2)
+                : new Vec3d(point.x + 0.5, point.y + 0.5, point.z + 0.5);
 
-            RenderUtils.drawStyledBox(pointVec, boxColor, boxColor, 3, false);
+            if (boxes?.size?.()) {
+                for (let boxIndex = 0; boxIndex < boxes.size(); boxIndex++) {
+                    const box = boxes.get(boxIndex).move(point.x, point.y, point.z);
+                    RenderUtils.drawFilledBox(box, boxColor, false);
+                    RenderUtils.drawWireFrameBox(box, boxColor, 3, false);
+                }
+            } else {
+                RenderUtils.drawStyledBox(new Vec3d(point.x, point.y, point.z), boxColor, boxColor, 3, false);
+            }
 
             if (i >= this.path.length - 1) continue;
 
             const next = this.path[i + 1];
-            RenderUtils.drawLine(centerVec, new Vec3d(next.x + 0.5, next.y + 1.05, next.z + 0.5), PATH_COLORS.pending, 3, false);
+            const nextBounds = getEtherwarpBlockShape(next)?.bounds?.();
+            const nextCenter = nextBounds
+                ? new Vec3d(
+                      next.x + (nextBounds.minX + nextBounds.maxX) / 2,
+                      next.y + (nextBounds.minY + nextBounds.maxY) / 2,
+                      next.z + (nextBounds.minZ + nextBounds.maxZ) / 2
+                  )
+                : new Vec3d(next.x + 0.5, next.y + 0.5, next.z + 0.5);
+            RenderUtils.drawLine(centerVec, nextCenter, PATH_COLORS.pending, 3, false);
         }
     }
 
@@ -588,7 +572,6 @@ class EtherwarpPathHandler {
         this.angles = [];
         this.currentGoal = null;
         this.currentRun = null;
-        this.finalNode = null;
         this.stopExecution(restoreSlot);
 
         if (typeof onSuccess !== 'function') return;
@@ -608,7 +591,6 @@ class EtherwarpPathHandler {
         this.angles = [];
         this.currentGoal = null;
         this.currentRun = null;
-        this.finalNode = null;
         this.stopExecution(restoreSlot);
         if (!silent) {
             Chat.messagePathfinder('&c' + failureReason);
@@ -625,4 +607,5 @@ class EtherwarpPathHandler {
     }
 }
 
-export const EtherwarpPathfinder = new EtherwarpPathHandler();
+export const FastEtherwarp = new EtherwarpPathHandler();
+export const EtherwarpPathfinder = FastEtherwarp;

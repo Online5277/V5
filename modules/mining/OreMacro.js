@@ -8,7 +8,7 @@ import { manager } from '../../utils/SkyblockEvents';
 import { TabListUtils } from '../../utils/TabListUtils';
 import { Utils } from '../../utils/Utils';
 import { v5Command } from '../../utils/V5Commands';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { FastEtherwarp } from '../../utils/FastEtherwarp';
 import { MiningBot } from './MiningBot';
 import { Guis } from '../../utils/player/Inventory';
 import { Keybind } from '../../utils/player/Keybinding';
@@ -109,8 +109,8 @@ class OreMiner extends ModuleBase {
         this.currentRenderTarget = null;
         this.nextRenderTarget = null;
 
-        this.oreMineSpeed = 0.12;
-        this.oreTeleportSpeed = 0.12;
+        this.oreMineSpeed = 0.48;
+        this.oreTeleportSpeed = 0.48;
         this.mineTimeoutTicks = 8;
         this.teleportStrafing = false;
         this.miningStrafing = false;
@@ -148,12 +148,12 @@ class OreMiner extends ModuleBase {
         );
 
         this.addSeparator('Rotations');
-        this.addSlider('Ore Mining Rotation Speed', 1, 100, 12, (value) => (this.oreMineSpeed = value / 100), 'Rotation speed for mining targets.');
+        this.addSlider('Ore Mining Rotation Speed', 1, 100, 48, (value) => (this.oreMineSpeed = value / 100), 'Rotation speed for mining targets.');
         this.addSlider(
             'Ore Etherwarp Rotation Speed',
             1,
             100,
-            12,
+            48,
             (value) => (this.oreTeleportSpeed = value / 100),
             'Rotation speed for etherwarping targets.'
         );
@@ -540,7 +540,7 @@ class OreMiner extends ModuleBase {
                 } else if (this.isAtWaypoint(waypoint)) {
                     this.enterState('MINE_INIT');
                 } else {
-                    this.aotvSlot = EtherwarpPathfinder.getEtherwarpSlot();
+                    this.aotvSlot = FastEtherwarp.getEtherwarpSlot();
                     if (this.aotvSlot < 0) {
                         this.message('&cNo Aspect of the Void/End found in your hotbar.');
                         return this.toggle(false);

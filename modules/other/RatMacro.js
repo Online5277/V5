@@ -6,7 +6,7 @@ import { MCHand } from '../../utils/Constants';
 import { finiteNumber, formatRoundedNumber } from '../../utils/NumberUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { ServerboundUseItemPacket } from '../../utils/Packets';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { EtherwarpPathfinder } from '../../utils/FastEtherwarp';
 import { Guis } from '../../utils/player/Inventory';
 import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';

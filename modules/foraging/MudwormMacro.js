@@ -1,7 +1,7 @@
 import { OverlayManager } from '../../gui/OverlayUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { MacroState } from '../../utils/MacroState';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { EtherwarpPathfinder } from '../../utils/FastEtherwarp';
 import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 

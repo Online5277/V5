@@ -1,8 +1,9 @@
 import { isDeveloperModeEnabled } from '../../utils/DeveloperModeState';
 import { Vec3d } from '../../utils/Constants';
+import { isAtEtherwarpLanding } from '../../utils/Etherwarp';
 import { MiningUtils } from '../../utils/MiningUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { FastEtherwarp } from '../../utils/FastEtherwarp';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
 import { Veins } from './GlaciteData';
 import { MiningBot } from './MiningBot';
@@ -111,7 +112,7 @@ class TunnelsMiner extends ModuleBase {
     }
 
     setTravelMode(mode) {
-        this.travelMode = mode === 'Etherwarp' ? mode : 'Walk';
+        this.travelMode = mode === 'Fast Etherwarp' ? mode : 'Walk';
     }
 
     onTick() {
@@ -165,7 +166,7 @@ class TunnelsMiner extends ModuleBase {
     }
 
     stopAll() {
-        EtherwarpPathfinder.cancel(true);
+        FastEtherwarp.cancel(true);
         Pathfinder.resetPath();
         if (this.botManaged) {
             MiningBot.toggle(false, true);
@@ -203,18 +204,25 @@ class TunnelsMiner extends ModuleBase {
             this.message('&cNo new mining position found.');
             return;
         }
+
+        const arrived = this.pendingTargets.find(({ candidate }) => isAtEtherwarpLanding({ x: candidate.x, y: candidate.y - 1, z: candidate.z }));
+        if (arrived) {
+            this.pendingTargets = [arrived];
+            this.onPathSuccess();
+            return;
+        }
         this.message(`&bPathing to best target (${ends.length} options)...`);
 
-        if (this.travelMode === 'Etherwarp') {
+        if (this.travelMode !== 'Walk') {
             let walking = false;
             const fallback = () => {
                 if (walking || !this.pendingTargets.length) return;
                 walking = true;
                 this.startWalkPath(ends);
             };
-            const started = EtherwarpPathfinder.findPath(ends, {
+            const started = FastEtherwarp.findPath(ends, {
                 silent: true,
-                onSuccess: () => this.onPathSuccess(),
+                onSuccess: (goal) => this.onPathSuccess(goal),
                 onFail: fallback,
             });
             if (!started) fallback();
@@ -243,8 +251,13 @@ class TunnelsMiner extends ModuleBase {
         );
     }
 
-    onPathSuccess() {
-        this.activeMiningPosition = this.pendingTargets.reduce((closest, target) => {
+    onPathSuccess(goal = null) {
+        const resolvedTarget = goal
+            ? this.pendingTargets.find(
+                  ({ candidate }) => candidate.x === goal.x && (candidate.y - 1 === goal.y || candidate.y === goal.y) && candidate.z === goal.z
+              )
+            : null;
+        const closestCandidate = this.pendingTargets.reduce((closest, target) => {
             if (!closest) return target.candidate;
             const targetDistance = Math.hypot(
                 Player.getX() - (target.candidate.x + 0.5),
@@ -254,6 +267,7 @@ class TunnelsMiner extends ModuleBase {
             const closestDistance = Math.hypot(Player.getX() - (closest.x + 0.5), Player.getY() - closest.y, Player.getZ() - (closest.z + 0.5));
             return targetDistance < closestDistance ? target.candidate : closest;
         }, null);
+        this.activeMiningPosition = resolvedTarget?.candidate || closestCandidate;
         this.pendingTargets = [];
         MiningBot.toggle(true, true);
         this.forceTunnelMiningBotCosts();

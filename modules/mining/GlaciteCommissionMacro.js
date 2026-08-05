@@ -5,7 +5,7 @@ import { MacroState } from '../../utils/MacroState';
 import { MiningUtils } from '../../utils/MiningUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { finiteNumber } from '../../utils/NumberUtils';
-import { EtherwarpPathfinder } from '../../utils/pathfinder/EtherwarpPathfinder';
+import { FastEtherwarp } from '../../utils/FastEtherwarp';
 import Pathfinder from '../../utils/pathfinder/PathFinder';
 import { Guis } from '../../utils/player/Inventory';
 import { manager } from '../../utils/SkyblockEvents';
@@ -26,7 +26,7 @@ const STATES = {
 
 const SUPPORTED_ORES = ['glacite', 'umber', 'tungsten', 'peridot', 'aquamarine', 'onyx', 'citrine'];
 const EMISSARY_LOCATION = [2, 121, 237];
-const TRAVEL_MODES = ['Walk', 'Etherwarp'];
+const TRAVEL_MODES = ['Walk', 'Fast Etherwarp'];
 
 class GlaciteCommissionMacro extends ModuleBase {
     constructor() {
@@ -73,7 +73,7 @@ class GlaciteCommissionMacro extends ModuleBase {
                 this.setState(STATES.CHOOSING);
                 this.delay(20);
             },
-            useEtherwarp: () => this.travelMode === 'Etherwarp',
+            getTravelMode: () => this.travelMode,
         });
 
         this.addMultiToggle(
@@ -177,7 +177,7 @@ class GlaciteCommissionMacro extends ModuleBase {
         this.areaCheckTime = null;
         this.commissionClaimer.cancelNpcRotation();
         this.stopTunnelMiner();
-        EtherwarpPathfinder.cancel(true);
+        FastEtherwarp.cancel(true);
         Pathfinder.resetPath(true);
     }
 
@@ -308,7 +308,7 @@ class GlaciteCommissionMacro extends ModuleBase {
         }
 
         const now = Date.now();
-        if (!Pathfinder.isPathing() && !EtherwarpPathfinder.isPathing() && !MiningBot.enabled && now - this.lastTunnelRestartAt >= 5000) {
+        if (!Pathfinder.isPathing() && !FastEtherwarp.isPathing() && !MiningBot.enabled && now - this.lastTunnelRestartAt >= 5000) {
             tunnelsMiner.restart();
             this.lastTunnelRestartAt = now;
         }
