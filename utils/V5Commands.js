@@ -2,6 +2,7 @@ import { Chat } from './Chat';
 import { File } from './Constants';
 import { isDeveloperModeEnabled, setDeveloperModeEnabled } from './DeveloperModeState';
 import { ServerInfo } from './player/ServerInfo';
+import { togglePiP } from './PiP';
 
 const commandRegistry = new Map();
 let developerModeEnableConfirmationPending = false;
@@ -88,6 +89,10 @@ const showServerInfo = () => {
 
 v5Command('tps', showServerInfo);
 v5Command('ping', showServerInfo);
+
+v5Command('pip', () => {
+    togglePiP();
+});
 
 v5Command(
     'mining gemstone',
