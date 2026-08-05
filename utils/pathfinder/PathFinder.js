@@ -132,7 +132,7 @@ class Finder {
         this.walkArrivalRadius = Number.isFinite(walkArrivalRadius) && walkArrivalRadius > 0 ? walkArrivalRadius : 2;
         if (!preserveRecalculateAttempts) {
             this.entityTarget = options?.entityTarget || null;
-            this.entityTargetResolver = typeof options?.resolveEntityTarget === 'function' ? options.resolveEntityTarget : null;
+            this.entityTargetResolver = options && typeof options.resolveEntityTarget === 'function' ? options.resolveEntityTarget : null;
             this.entityGoalOffsets = this.createEntityGoalOffsets(end, this.entityTarget);
             this.entityTrackDistance = Number.isFinite(options?.entityTrackDistance) && options.entityTrackDistance > 0 ? options.entityTrackDistance : 8;
             this.silent = options?.silent === true;
