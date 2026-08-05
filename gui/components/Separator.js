@@ -1,4 +1,4 @@
-import { FontSizes, PADDING, THEME, drawRoundedRectangle, drawText } from '../Utils';
+import { FontSizes, PADDING, THEME, drawRoundedRectangle, drawText, getTextWidth } from '../Utils';
 
 export class Separator {
     constructor(title, fullWidth = false) {
@@ -14,16 +14,18 @@ export class Separator {
 
     draw(mouseX, mouseY) {
         const width = this.optionPanelWidth - PADDING * 2 - (this.fullWidth ? 0 : 20);
+        const titleX = this.x + 8;
+        const lineX = titleX + getTextWidth(this.title, FontSizes.REGULAR) + 8;
 
         drawRoundedRectangle({
-            x: this.x,
+            x: lineX,
             y: this.y + 8,
-            width,
+            width: Math.max(0, this.x + width - lineX),
             height: 1,
             radius: 1,
             color: THEME.BG_INSET,
         });
 
-        drawText(this.title, this.x + 8, this.y + 8, FontSizes.REGULAR, THEME.TEXT);
+        drawText(this.title, titleX, this.y + 8, FontSizes.REGULAR, THEME.TEXT);
     }
 }

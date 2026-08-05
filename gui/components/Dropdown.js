@@ -171,9 +171,11 @@ export class MultiToggle {
 
         drawText(this.title, this.x, this.y + this.containerHeight / 2, FontSizes.REGULAR, textColor);
 
+        const selected = this.options.filter((option) => option.enabled);
+        const selectedText = selected.length === 1 ? selected[0].name : selected.length > 1 ? '...' : 'None';
         const arrowSize = 10;
         const rightMargin = 6;
-        const selectWidth = 80;
+        const selectWidth = Math.max(80, getTextWidth(selectedText, FontSizes.REGULAR) + 28);
         const selectX = this.x + panelWidth - selectWidth;
         const arrowX = selectX + selectWidth - arrowSize - rightMargin;
         const arrowY = this.y + (this.containerHeight - arrowSize) / 2;
@@ -189,8 +191,6 @@ export class MultiToggle {
             borderColor: THEME.BORDER,
         });
 
-        const selected = this.options.filter((option) => option.enabled);
-        const selectedText = selected.length === 1 ? selected[0].name : selected.length > 1 ? '...' : 'None';
         NVG.save();
         NVG.scissor(selectX + 10, this.y + this.containerHeight / 2 - 9, arrowX - selectX - 12, 18);
         drawText(selectedText, selectX + 10, this.y + this.containerHeight / 2, FontSizes.REGULAR, textColor);
