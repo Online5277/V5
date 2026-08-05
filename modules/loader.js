@@ -50,6 +50,7 @@ import './skills/WynnProfessionMacro';
 /* OTHER */
 import './other/AutoBeg';
 import './other/AutoConversation';
+import './other/AutoForge';
 import './other/AuctionHelper';
 import './other/BeachBaller';
 import './other/CancelInteract';
