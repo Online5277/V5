@@ -291,7 +291,8 @@ class PathRotations {
         const playerEyes = player.getEyePosition();
 
         const motionY = Player.getMotionY();
-        const isFalling = motionY < -0.4 || this.isPathDropping();
+        const isFalling = motionY < -0.4;
+        const isPathDropping = this.isPathDropping();
         const pathAnchor = this.getInterpolatedPoint(this.currentPathPosition);
         if (!pathAnchor) {
             this.rotationActive = false;
@@ -341,7 +342,7 @@ class PathRotations {
             const maxJump = isTeleportResync ? 14.0 : isFalling ? 0.5 : 2.0;
             this.currentPathPosition = Math.min(this.currentPathPosition + maxJump, bestT);
         }
-        if (!isTeleportResync) {
+        if (!isTeleportResync && !isPathDropping) {
             this.applyPredictedPathProgress(player);
         }
 
@@ -391,7 +392,7 @@ class PathRotations {
             targetPoint = new Vec3d(targetPoint.x, playerEyes.y() + newDy, targetPoint.z);
         }
 
-        if (isFalling && rawHorz < 0.5) {
+        if ((isFalling || isPathDropping) && rawHorz < 0.5) {
             const boostT = Math.min(this.boxPositions.length - 1, this.currentPathPosition + 2.5);
             targetPoint = this.getInterpolatedPoint(boostT);
         }
