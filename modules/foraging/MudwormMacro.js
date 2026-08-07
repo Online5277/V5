@@ -6,7 +6,7 @@ import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 
 const FALLBACK_TARGET = { x: -648, y: 124, z: 5 };
-const TORRHUS_FALLBACK_TARGET = { x: -647, y: 119, z: 220 };
+const TORRHUS_FALLBACK_TARGET = { x: -608, y: 104, z: 248 };
 const TARGET_TIMEOUT_MS = 2000;
 const ENTITY_LOAD_WAIT_TICKS = 60;
 const FALLBACK_WAIT_MS = 1000;
