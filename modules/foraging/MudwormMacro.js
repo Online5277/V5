@@ -6,6 +6,7 @@ import { Rotations } from '../../utils/player/Rotations';
 import { ScheduleTask } from '../../utils/ScheduleTask';
 
 const FALLBACK_TARGET = { x: -648, y: 124, z: 5 };
+const TORRHUS_FALLBACK_TARGET = { x: -647, y: 119, z: 220 };
 const TARGET_TIMEOUT_MS = 2000;
 const ENTITY_LOAD_WAIT_TICKS = 60;
 const FALLBACK_WAIT_MS = 1000;
@@ -155,7 +156,7 @@ class MudwormMacro extends ModuleBase {
     checkFallback() {
         this.busy = true;
         this.checkingFallback = true;
-        const started = EtherwarpPathfinder.findPath(FALLBACK_TARGET, {
+        const started = EtherwarpPathfinder.findPath(this.autoRewarp === 'Warp Torrhus' ? TORRHUS_FALLBACK_TARGET : FALLBACK_TARGET, {
             silent: true,
             onSuccess: () => this.finishFallback(),
             onFail: () => this.failFallback(),
