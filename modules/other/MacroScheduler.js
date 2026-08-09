@@ -51,7 +51,7 @@ class MacroScheduler extends ModuleBase {
                 this.macroTimeMax = v.high;
             },
             'Minimum session duration.',
-            sectionName,
+            sectionName
         );
         this.addDirectRangeSlider(
             'Break Duration (m)',
@@ -63,7 +63,7 @@ class MacroScheduler extends ModuleBase {
                 this.breakTimeMax = v.high;
             },
             'Minimum break duration.',
-            sectionName,
+            sectionName
         );
 
         this.createSchedulerOverlay([
@@ -88,9 +88,7 @@ class MacroScheduler extends ModuleBase {
 
         const savedState = Object.values(STATE).includes(data.state) ? data.state : STATE.IDLE;
         this.state = savedState === STATE.PAUSED ? STATE.IDLE : savedState;
-        this.trackedMacros = Array.isArray(data.trackedMacros)
-            ? data.trackedMacros.filter((v) => typeof v === 'string')
-            : [];
+        this.trackedMacros = Array.isArray(data.trackedMacros) ? data.trackedMacros.filter((v) => typeof v === 'string') : [];
         this.timerEnd = Number.isFinite(data.timerEnd) ? data.timerEnd : 0;
         this.breakDurationMs = Number.isFinite(data.breakDurationMs) ? data.breakDurationMs : 0;
         this.returnStep = Number.isFinite(data.returnStep) ? Math.max(0, Math.min(3, data.returnStep)) : 0;
@@ -393,10 +391,7 @@ class MacroScheduler extends ModuleBase {
             lines.push('**' + name + '**' + (macroLines.length ? '\n' + macroLines.join('\n') : ''));
         });
 
-        const description = [
-            `Break Time: ${cleanBreakTime}`,
-            lines.length ? lines.join('\n\n') : 'No macro stats available.',
-        ].join('\n\n');
+        const description = [`Break Time: ${cleanBreakTime}`, lines.length ? lines.join('\n\n') : 'No macro stats available.'].join('\n\n');
         this.sendSchedulerEmbed('Scheduler Disconnected', description, 0xe67e22);
     }
 
@@ -416,7 +411,7 @@ class MacroScheduler extends ModuleBase {
                     footer: { text: 'V5 Scheduler' },
                 },
             ],
-            false,
+            false
         );
     }
 
@@ -425,9 +420,7 @@ class MacroScheduler extends ModuleBase {
         if (!module) return [];
 
         const overlayName = module.oid || macroName;
-        const overlay = Array.isArray(OverlayManager.ids)
-            ? OverlayManager.ids.find((id) => id && id.name === overlayName)
-            : null;
+        const overlay = Array.isArray(OverlayManager.ids) ? OverlayManager.ids.find((id) => id && id.name === overlayName) : null;
         if (!overlay || !Array.isArray(overlay.sections)) return [];
 
         const lines = [];
@@ -477,8 +470,7 @@ class MacroScheduler extends ModuleBase {
     formatTimeLeft() {
         if (this.state === STATE.IDLE) return 'Waiting';
 
-        const remaining =
-            this.state === STATE.PAUSED ? Math.max(0, this.pausedRemainingMs) : Math.max(0, this.timerEnd - Date.now());
+        const remaining = this.state === STATE.PAUSED ? Math.max(0, this.pausedRemainingMs) : Math.max(0, this.timerEnd - Date.now());
         const timeStr = TimeUtils.formatDurationMs(remaining);
 
         if (this.state === STATE.RETURNING) return `Returning (${timeStr})`;
