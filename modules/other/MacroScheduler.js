@@ -92,7 +92,6 @@ class MacroScheduler extends ModuleBase {
         this.timerEnd = Number.isFinite(data.timerEnd) ? data.timerEnd : 0;
         this.breakDurationMs = Number.isFinite(data.breakDurationMs) ? data.breakDurationMs : 0;
         this.returnStep = Number.isFinite(data.returnStep) ? Math.max(0, Math.min(3, data.returnStep)) : 0;
-        this.pausedRemainingMs = 0;
     }
 
     saveState() {
@@ -102,7 +101,6 @@ class MacroScheduler extends ModuleBase {
             timerEnd: this.timerEnd,
             breakDurationMs: this.breakDurationMs,
             returnStep: this.returnStep,
-            pausedRemainingMs: this.pausedRemainingMs,
         });
     }
 
@@ -161,7 +159,7 @@ class MacroScheduler extends ModuleBase {
     }
 
     updateOverlay() {
-        const shouldShow = this.state !== STATE.IDLE;
+        const shouldShow = this.state !== STATE.IDLE && this.state !== STATE.PAUSED;
         if (shouldShow && !this.overlayShown) {
             OverlayManager.startTime(this.oid, true);
             this.overlayShown = true;
@@ -219,7 +217,6 @@ class MacroScheduler extends ModuleBase {
         this.state = STATE.PAUSED;
         this.saveState();
         this.updateOverlay();
-        this.message('&eSession paused. Resume by re-enabling the macro.');
     }
 
     handlePaused() {
@@ -232,7 +229,6 @@ class MacroScheduler extends ModuleBase {
             this.state = STATE.RUNNING;
             this.saveState();
             this.updateOverlay();
-            this.message('&aSession resumed.');
         }
     }
 
