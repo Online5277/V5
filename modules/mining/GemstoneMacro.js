@@ -428,7 +428,7 @@ class GemstoneMacro extends ModuleBase {
             dz = targetVec.z - eye.z();
         const yaw = Math.atan2(-dx, dz) * (180 / Math.PI);
         const pitch = Math.atan2(-dy, Math.hypot(dx, dz)) * (180 / Math.PI);
-        Client.sendPacket(new ServerboundUseItemPacket(MCHand.MAIN_HAND, 0, Number.parseFloat(yaw), Number.parseFloat(pitch)));
+        Client.sendSequencedPacket((sequence) => new ServerboundUseItemPacket(MCHand.MAIN_HAND, sequence, Number.parseFloat(yaw), Number.parseFloat(pitch)));
     }
 
     onEnable() {

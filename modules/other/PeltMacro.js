@@ -656,7 +656,7 @@ class PeltMacro extends ModuleBase {
             const pitch = Number.parseFloat(Player.getPitch());
             if (!Number.isFinite(yaw) || !Number.isFinite(pitch)) return;
 
-            Client.sendPacket(new ServerboundUseItemPacket(MCHand.MAIN_HAND, 0, yaw, pitch));
+            Client.sendSequencedPacket((sequence) => new ServerboundUseItemPacket(MCHand.MAIN_HAND, sequence, yaw, pitch));
             if (isLast && this.travelState?.sequenceToken === token) {
                 this.travelState.routeCompletedAt = Date.now();
             }
