@@ -329,7 +329,7 @@ class OreMiner extends ModuleBase {
         this.message('&cUsage: /v5 mining ore edit <add|deployable|remove|removemine|undo|clear|list|done>');
     }
 
-addWaypoint(type, indexArg) {
+    addWaypoint(type, indexArg) {
         const route = this.loadedWaypoints || (this.loadedWaypoints = []);
         const index = indexArg === undefined ? route.length : Number.parseInt(indexArg, 10);
         if (!Number.isInteger(index) || index < 0 || index > route.length) {
