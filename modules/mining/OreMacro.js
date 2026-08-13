@@ -351,7 +351,9 @@ class OreMiner extends ModuleBase {
 
     addMineBlock(type, indexArg) {
         const route = this.loadedWaypoints;
-        const index = indexArg === undefined ? route?.length - 1 : Number.parseInt(indexArg, 10);
+        const defaultIndex = this.selectedWaypoint ?? (route?.length ? route.length - 1 : -1);
+        const index = indexArg === undefined ? defaultIndex : Number.parseInt(indexArg, 10);
+
         if (!route?.length || !Number.isInteger(index) || index < 0 || index >= route.length) {
             return this.message('&cAdd a waypoint first, or provide a valid waypoint index.');
         }
@@ -361,13 +363,17 @@ class OreMiner extends ModuleBase {
         if (!pos) return this.message('&cLook at a block within 10 blocks.');
 
         this.recordUndo();
-        route[index].minableBlocks.push({
+
+        const blockData = {
             x: pos.getX(),
             y: pos.getY(),
             z: pos.getZ(),
-            oneTap: type === 'onetap',
-            rOneTap: type === 'ronetap',
-        });
+        };
+
+        if (type === 'onetap') blockData.oneTap = true;
+        if (type === 'ronetap') blockData.rOneTap = true;
+
+        route[index].minableBlocks.push(blockData);
         this.selectedWaypoint = index;
         this.message(`&aAdded ${type} block to waypoint [${index}].`);
     }
