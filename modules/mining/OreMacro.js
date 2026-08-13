@@ -353,7 +353,7 @@ class OreMiner extends ModuleBase {
         const route = this.loadedWaypoints;
         const defaultIndex = this.selectedWaypoint ?? (route?.length ? route.length - 1 : -1);
         const index = indexArg === undefined ? defaultIndex : Number.parseInt(indexArg, 10);
-        
+
         if (!route?.length || !Number.isInteger(index) || index < 0 || index >= route.length) {
             return this.message('&cAdd a waypoint first, or provide a valid waypoint index.');
         }
@@ -363,13 +363,13 @@ class OreMiner extends ModuleBase {
         if (!pos) return this.message('&cLook at a block within 10 blocks.');
 
         this.recordUndo();
-        
+
         const blockData = {
             x: pos.getX(),
             y: pos.getY(),
-            z: pos.getZ()
+            z: pos.getZ(),
         };
-        
+
         if (type === 'onetap') blockData.oneTap = true;
         if (type === 'ronetap') blockData.rOneTap = true;
 
