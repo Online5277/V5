@@ -236,7 +236,6 @@ class Bot extends ModuleBase {
         this.normalRender = register('postRenderWorld', () => this.renderNormal()).unregister();
 
         this.on('packetReceived', (packet) => this.onPrecisionMinerParticle(packet)).setFilteredClass(ClientboundLevelParticlesPacket);
-
         this.on('tick', () => {
             if (!this.enabled) return;
             if (this.refreshingMiningStats) {
@@ -507,8 +506,10 @@ class Bot extends ModuleBase {
 
         if (isSameAsLast && this.lastBlockType && this.lastBlockType !== blockName) {
             if (!this.isAirOrBedrock(blockName)) {
+                Client.setKey('leftclick', false);
                 this.lastBlockType = blockName;
                 this.resetTickCounters();
+                this.handleRotationOrScan(false);
                 return false;
             }
         }
