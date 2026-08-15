@@ -1,4 +1,4 @@
-import { GLFW, Vec3d } from '../../utils/Constants';
+import { ClipContext, GLFW, Vec3d } from '../../utils/Constants';
 import { Camera } from '../../utils/Camera';
 import { Mixin } from '../../utils/MixinManager';
 import { ModuleBase } from '../../utils/ModuleBase';
@@ -9,8 +9,6 @@ import { mc } from '../../utils/Utils';
 
 const Perspective = net.minecraft.client.CameraType;
 const InputConstants = com.mojang.blaze3d.platform.InputConstants;
-const ClipContext = net.minecraft.world.level.ClipContext;
-
 class Freecam extends ModuleBase {
     constructor() {
         super({

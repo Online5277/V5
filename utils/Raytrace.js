@@ -1,14 +1,12 @@
 import { raytraceBlocks } from './dependencies/BloomCore/RaytraceBlocks';
 import { Vector3 } from './dependencies/BloomCore/Vector3';
-import { Vec3d } from './Constants';
+import { ClipContext, Vec3d } from './Constants';
 import { MathUtils } from './Math';
 
 export const SAMPLE_POINTS_PER_FACE = 9;
 export const MAX_DDA_ITERATIONS = 300;
 export const AIR_BLOCK_ID = 0;
 export const PASSABLE_BLOCKS = new Set([0, 513]);
-
-const RaycastContext = net.minecraft.world.level.ClipContext;
 
 class VisibilityChecker {
     constructor() {
@@ -106,7 +104,7 @@ class VisibilityChecker {
 
             const start = new Vec3d(eyePos.x, eyePos.y, eyePos.z);
             const end = new Vec3d(...point);
-            const result = world.clip(new RaycastContext(start, end, RaycastContext.Block.OUTLINE, RaycastContext.Fluid.NONE, player));
+            const result = world.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
             if (!result || String(result.getType?.()) === 'MISS') return false;
 
             const hitPos = result.getBlockPos();

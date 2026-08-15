@@ -1,5 +1,5 @@
 import { OverlayManager } from '../../gui/OverlayUtils';
-import { MCHand, Vec3d } from '../../utils/Constants';
+import { ClipContext, MCHand, Vec3d } from '../../utils/Constants';
 import { MacroState } from '../../utils/MacroState';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { formatRoundedNumber } from '../../utils/NumberUtils';
@@ -17,8 +17,6 @@ import { PeltQOLModule } from './PeltQOL';
 import { Mouse } from '../../utils/Ungrab';
 
 // this is complete codex vibecoded slop, but it works so who cares!
-
-const RaycastContext = net.minecraft.world.level.ClipContext;
 
 const TREVOR_TARGETS = {
     'desert settlement': [
@@ -350,7 +348,7 @@ class PeltMacro extends ModuleBase {
                     for (const zOffset of MOB_VISIBILITY_SAMPLE_OFFSETS) {
                         const sampleZ = minZ + (maxZ - minZ) * zOffset;
                         const hit = world.clip(
-                            new RaycastContext(eyePos, new Vec3d(sampleX, sampleY, sampleZ), RaycastContext.Block.COLLIDER, RaycastContext.Fluid.NONE, player)
+                            new ClipContext(eyePos, new Vec3d(sampleX, sampleY, sampleZ), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
                         );
 
                         if (!hit || String(hit.getType()) === 'MISS') {
@@ -411,7 +409,7 @@ class PeltMacro extends ModuleBase {
             dz /= len;
             const ext = ETHERWARP_LOS_RAY_EXTEND;
             const endVec = new Vec3d(endX + dx * ext, endY + dy * ext, endZ + dz * ext);
-            const hit = world.clip(new RaycastContext(eyePos, endVec, RaycastContext.Block.COLLIDER, RaycastContext.Fluid.NONE, player));
+            const hit = world.clip(new ClipContext(eyePos, endVec, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
             if (!hit) return false;
             const typeStr = String(hit.getType?.());
             if (typeStr === 'MISS') return false;

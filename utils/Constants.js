@@ -50,6 +50,7 @@ export const FFMPEG_URLS = {
 
 export const BP = net.minecraft.core.BlockPos;
 export const Vec3d = net.minecraft.world.phys.Vec3;
+export const ClipContext = net.minecraft.world.level.ClipContext;
 export const Direction = net.minecraft.core.Direction;
 export const BlockHitResult = net.minecraft.world.phys.BlockHitResult;
 export const VoxelShapes = net.minecraft.world.phys.shapes.Shapes;
@@ -61,6 +62,8 @@ export const ZombieEntity = net.minecraft.world.entity.monster.zombie.Zombie;
 export const EndermanEntity = net.minecraft.world.entity.monster.EnderMan;
 export const BatEntity = net.minecraft.world.entity.ambient.Bat;
 export const PortalParticle = net.minecraft.client.particle.PortalParticle; // pls rename to the correct name idk what it is
+export const CritParticle = net.minecraft.core.particles.ParticleTypes.CRIT;
+export const HappyVillagerParticle = net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER;
 
 export const MinecraftText = net.minecraft.network.chat.Component;
 export const Formatting = net.minecraft.ChatFormatting;

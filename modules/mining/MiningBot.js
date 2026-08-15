@@ -1,8 +1,9 @@
-import { BP, MCHand, Vec3d } from '../../utils/Constants';
+import { BP, ClipContext, CritParticle, HappyVillagerParticle, MCHand, Vec3d } from '../../utils/Constants';
 import { MathUtils } from '../../utils/Math';
 import { MiningUtils } from '../../utils/MiningUtils';
 import { ModuleBase } from '../../utils/ModuleBase';
 import { NukerUtils } from '../../utils/NukerUtils';
+import { ClientboundLevelParticlesPacket } from '../../utils/Packets';
 import { Raytrace } from '../../utils/Raytrace';
 import { manager } from '../../utils/SkyblockEvents';
 import { Utils } from '../../utils/Utils';
@@ -30,6 +31,7 @@ const TARGET_MODES = {
     REACHABLE: 'reachable',
     APPROACH: 'approach',
 };
+const PRECISION_MINER_PARTICLE_LIFETIME_MS = 500;
 
 class Bot extends ModuleBase {
     constructor() {
@@ -47,6 +49,7 @@ class Bot extends ModuleBase {
 
         this.PRIORITIZE_TITANIUM = true;
         this.PRIORITIZE_GRAY_MITHRIL = false;
+        this.PRECISION_MINER = true;
         this.TICKGLIDE = true;
         this.FAKELOOK = false;
         this.MOVEMENT = false;
@@ -232,6 +235,8 @@ class Bot extends ModuleBase {
         this.debug = register('postRenderWorld', () => this.renderDebug()).unregister();
         this.normalRender = register('postRenderWorld', () => this.renderNormal()).unregister();
 
+        this.on('packetReceived', (packet) => this.onPrecisionMinerParticle(packet)).setFilteredClass(ClientboundLevelParticlesPacket);
+
         this.on('tick', () => {
             if (!this.enabled) return;
             if (this.refreshingMiningStats) {
@@ -336,6 +341,15 @@ class Bot extends ModuleBase {
                 this.setPrioritizeGrayMithril(value);
             },
             'Reverses mithril block targeting costs to prioritise gray mithril.'
+        );
+        this.addToggle(
+            'Precision Miner',
+            (value) => {
+                this.PRECISION_MINER = value;
+                if (!value) this.precisionMinerAim = null;
+            },
+            'Aims at visible Precision Miner particles without looking away from the target block.',
+            true
         );
         this.addMultiToggle(
             'Fakelook',
@@ -701,7 +715,8 @@ class Bot extends ModuleBase {
         if (!this.currentTarget) return;
 
         const tunnelMode = this.isTunnelMode();
-        this.miningspeed = (tunnelMode ? MiningUtils.getSpeedWithCold() : MiningUtils.getMiningSpeed()) || 1;
+        const precisionMinerAim = this.getPrecisionMinerAim();
+        this.miningspeed = ((tunnelMode ? MiningUtils.getSpeedWithCold() : MiningUtils.getMiningSpeed()) || 1) * (precisionMinerAim?.boosted ? 1.3 : 1);
         this.totalTicks = MiningUtils.getMineTime(this.currentTarget, this.miningspeed, this.speedBoost) + this.glideDelay();
 
         this.handleBreaking(blockName, fakeLookMode);
@@ -712,10 +727,75 @@ class Bot extends ModuleBase {
             this.handleRotationOrScan(false);
         }
 
-        const targetVector = this.getAimVectorForTarget(this.currentTarget);
+        const targetVector = this.getPrecisionMinerAim() || this.getAimVectorForTarget(this.currentTarget);
         if (this.currentTarget && targetVector) {
             Rotations.lookAtVector(targetVector);
         }
+    }
+
+    onPrecisionMinerParticle(packet) {
+        if (!this.PRECISION_MINER) return;
+        const particle = packet.getParticle();
+        const type = particle?.getType?.() ?? particle;
+        if (
+            (type !== CritParticle && type !== HappyVillagerParticle) ||
+            packet.getCount() !== 1 ||
+            packet.getXDist() !== 0 ||
+            packet.getYDist() !== 0 ||
+            packet.getZDist() !== 0 ||
+            packet.getMaxSpeed() !== 0
+        )
+            return;
+
+        const target = this.currentTarget;
+        if (!target) return;
+        const aim = {
+            x: packet.getX(),
+            y: packet.getY(),
+            z: packet.getZ(),
+            targetX: target.x,
+            targetY: target.y,
+            targetZ: target.z,
+            boosted: type === HappyVillagerParticle,
+            expiresAt: Date.now() + PRECISION_MINER_PARTICLE_LIFETIME_MS,
+        };
+        if (this.isPrecisionMinerAimValid(aim)) this.precisionMinerAim = aim;
+    }
+
+    getPrecisionMinerAim() {
+        if (!this.PRECISION_MINER) return null;
+        if (!this.precisionMinerAim || this.precisionMinerAim.expiresAt < Date.now()) return null;
+        return this.isPrecisionMinerAimValid(this.precisionMinerAim) ? this.precisionMinerAim : null;
+    }
+
+    isPrecisionMinerAimValid(aim) {
+        const target = this.currentTarget;
+        const blockName = target && World.getBlockAt(target.x, target.y, target.z)?.type?.getRegistryName();
+        if (!target || aim.targetX !== target.x || aim.targetY !== target.y || aim.targetZ !== target.z || !this.mithrilCosts[blockName]) return false;
+
+        const player = Player.getPlayer();
+        const world = World.getWorld();
+        const eye = player?.getEyePosition();
+        if (!player || !world || !eye) return false;
+
+        const dx = aim.x - eye.x();
+        const dy = aim.y - eye.y();
+        const dz = aim.z - eye.z();
+        const distance = Math.hypot(dx, dy, dz);
+        if (!distance || distance > this.faceReach) return false;
+
+        const end = new Vec3d(
+            eye.x() + (dx / distance) * this.faceReach,
+            eye.y() + (dy / distance) * this.faceReach,
+            eye.z() + (dz / distance) * this.faceReach
+        );
+        const hit = world.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+        if (String(hit?.getType?.()) !== 'BLOCK') return false;
+        const hitPos = hit?.getBlockPos?.();
+        if (!hitPos || hitPos.getX() !== target.x || hitPos.getY() !== target.y || hitPos.getZ() !== target.z) return false;
+
+        const hitPoint = hit.getLocation();
+        return Math.hypot(hitPoint.x() - eye.x(), hitPoint.y() - eye.y(), hitPoint.z() - eye.z()) >= distance;
     }
 
     insertSortedCandidate(list, candidate, maxCount, scoreKey = 'cost') {
@@ -1467,6 +1547,7 @@ class Bot extends ModuleBase {
         this.lastRenderPos = null;
         this.lastAimPos = null;
         this.lastNextPos = null;
+        this.precisionMinerAim = null;
         Rotations.stop();
         this.normalRender.unregister();
     }
