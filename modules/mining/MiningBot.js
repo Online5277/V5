@@ -348,7 +348,7 @@ class Bot extends ModuleBase {
                 this.PRECISION_MINER = value;
                 if (!value) this.precisionMinerAim = null;
             },
-            'Aims at visible Precision Miner particles without looking away from the target block.',
+            'Aims at the Precision Miner particle, speeds up mining mithril.',
             true
         );
         this.addMultiToggle(
