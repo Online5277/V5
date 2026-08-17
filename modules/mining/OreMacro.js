@@ -647,8 +647,23 @@ class OreMiner extends ModuleBase {
                 return;
 
             case 'WARP':
-                if (this.waitTicks === 0) ChatLib.command(`warp ${waypoint.warpCommand}`);
-                if (++this.waitTicks >= 1) this.enterState('ADVANCE');
+                if (this.waitTicks === 0) {
+                    this.warpStartPos = { x: Player.getX(), y: Player.getY(), z: Player.getZ() };
+                    ChatLib.command(`warp ${waypoint.warpCommand}`);
+                }
+                if (++this.waitTicks >= 40) {
+                    const movedDistance = Math.hypot(
+                        Player.getX() - this.warpStartPos.x,
+                        Player.getY() - this.warpStartPos.y,
+                        Player.getZ() - this.warpStartPos.z
+                    );
+                    if (movedDistance < 5) {
+                        this.message(`&cWarp failed: ${waypoint.warpCommand}`);
+                        this.toggle(false);
+                        return;
+                    }
+                    this.enterState('ADVANCE');
+                }
                 return;
 
             case 'TP_ROTATE':
