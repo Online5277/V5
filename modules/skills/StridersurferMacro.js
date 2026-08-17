@@ -306,7 +306,7 @@ class StridersurferMacro extends ModuleBase {
     }
 
     getAxeSlot() {
-        return this.findHotbarSlotByNames(['Figstone Splitter', 'axe']);
+        return this.findHotbarSlotByNames(['Helix Chopper', 'Figstone Splitter', 'axe']);
     }
 
     getRodSlot() {
