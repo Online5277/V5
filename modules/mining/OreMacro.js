@@ -66,6 +66,8 @@ const COLORS = {
     teleportWire: new RenderColor(180, 100, 255, 125),
     walkFill: new RenderColor(100, 200, 255, 15),
     walkWire: new RenderColor(100, 200, 255, 190),
+    warpFill: new RenderColor(255, 200, 0, 20),
+    warpWire: new RenderColor(255, 200, 0, 180),
     deployableFill: new RenderColor(180, 0, 180, 20),
     deployableWire: new RenderColor(180, 0, 180, 220),
     selectedFill: new RenderColor(255, 255, 255, 35),
@@ -287,7 +289,7 @@ class OreMiner extends ModuleBase {
         this.message('  &fload <name> &7- load a route');
         this.message('  &fsave <name> &7- save the current route');
         this.message('  &flist | start | stop | status');
-        this.message('  &fedit add <tp|walk> [index] &7- append, or insert and shift later waypoints');
+        this.message('  &fedit add <tp|walk|warp> [index] &7- append, or insert and shift later waypoints');
         this.message('  &fedit add <mine|onetap|ronetap> [waypoint] &7- add the block under your crosshair');
         this.message('  &fedit deployable <waypoint> &7- toggle deployable placement');
         this.message('  &fedit remove <waypoint> &7- remove a waypoint');
@@ -304,8 +306,9 @@ class OreMiner extends ModuleBase {
         if (action === 'add') {
             const type = String(args.shift() || '').toLowerCase();
             if (type === 'tp' || type === 'walk') return this.addWaypoint(type, args[0]);
+            if (type === 'warp') return this.addWarpWaypoint(args);
             if (['mine', 'onetap', 'ronetap'].includes(type)) return this.addMineBlock(type, args[0]);
-            return this.message('&cUsage: /v5 mining ore edit add <tp|walk|mine|onetap|ronetap> [waypoint]');
+            return this.message('&cUsage: /v5 mining ore edit add <tp|walk|warp|mine|onetap|ronetap> [waypoint]');
         } else if (action === 'deployable') {
             return this.toggleDeployable(args[0]);
         } else if (action === 'removemine') {
@@ -347,6 +350,23 @@ class OreMiner extends ModuleBase {
         const inserted = index < route.length - 1;
         this.message(`&a${inserted ? 'Inserted' : 'Added'} ${route[index].type} waypoint [${index}].`);
         if (inserted) this.message(`&7Existing waypoint indexes ${index} and later were shifted forward.`);
+    }
+
+    addWarpWaypoint(args) {
+        const route = this.loadedWaypoints || (this.loadedWaypoints = []);
+        const warpCommand = args.join(' ').trim();
+        if (!warpCommand) return this.message('&cUsage: /v5 mining ore edit add warp <warp command>');
+
+        this.recordUndo();
+        route.push({
+            pos: { x: Math.floor(Player.getX()), y: Math.floor(Player.getY()) - 1, z: Math.floor(Player.getZ()) },
+            type: 'Warp',
+            warpCommand,
+            minableBlocks: [],
+            isDeployable: false,
+        });
+        this.selectedWaypoint = route.length - 1;
+        this.message(`&aAdded Warp waypoint [${route.length - 1}] with command: &f/warp ${warpCommand}`);
     }
 
     addMineBlock(type, indexArg) {
@@ -434,8 +454,9 @@ class OreMiner extends ModuleBase {
         this.message(`&bOre route &7(${this.loadedWaypoints.length} waypoints):`);
         this.loadedWaypoints.forEach((waypoint, index) => {
             const deployable = waypoint.isDeployable ? ' &d[DEPLOYABLE]' : '';
+            const warpInfo = waypoint.type === 'Warp' ? ` &e/warp ${waypoint.warpCommand}` : '';
             this.message(
-                `  &8[${index}] &f${waypoint.type}${deployable} &7@ &e${waypoint.pos.x}, ${waypoint.pos.y}, ${waypoint.pos.z} &7- &f${waypoint.minableBlocks.length} blocks`
+                `  &8[${index}] &f${waypoint.type}${deployable}${warpInfo} &7@ &e${waypoint.pos.x}, ${waypoint.pos.y}, ${waypoint.pos.z} &7- &f${waypoint.minableBlocks.length} blocks`
             );
             waypoint.minableBlocks.forEach((block, mineIndex) => {
                 const oneTap = block.oneTap ? ' &6[ONE-TAP]' : block.rOneTap ? ' &b[R-ONE-TAP]' : '';
@@ -498,7 +519,7 @@ class OreMiner extends ModuleBase {
     normalizeWaypoint(waypoint) {
         if (!waypoint || !waypoint.pos) return null;
         const type = String(waypoint.type || '').toLowerCase();
-        if (type !== 'tp' && type !== 'walk') return null;
+        if (type !== 'tp' && type !== 'walk' && type !== 'warp') return null;
         const pos = this.normalizePosition(waypoint.pos);
         if (!pos) return null;
 
@@ -519,7 +540,8 @@ class OreMiner extends ModuleBase {
 
         return {
             pos,
-            type: type === 'tp' ? 'Tp' : 'Walk',
+            type: type === 'tp' ? 'Tp' : type === 'walk' ? 'Walk' : 'Warp',
+            warpCommand: type === 'warp' ? String(waypoint.warpCommand || '') : undefined,
             minableBlocks,
             isDeployable: !!waypoint.isDeployable,
         };
@@ -602,7 +624,9 @@ class OreMiner extends ModuleBase {
 
         switch (this.state) {
             case 'WAYPOINT':
-                if (waypoint.type === 'Walk') {
+                if (waypoint.type === 'Warp') {
+                    this.enterState('WARP');
+                } else if (waypoint.type === 'Walk') {
                     this.updateWalkWaypointLookAhead();
                     this.enterState('WALK');
                 } else if (this.isAtWaypoint(waypoint)) {
@@ -620,6 +644,11 @@ class OreMiner extends ModuleBase {
                     this.teleportAimIndex = 0;
                     this.enterState('TP_ROTATE');
                 }
+                return;
+
+            case 'WARP':
+                if (this.waitTicks === 0) ChatLib.command(`warp ${waypoint.warpCommand}`);
+                if (++this.waitTicks >= 1) this.enterState('ADVANCE');
                 return;
 
             case 'TP_ROTATE':
@@ -1580,9 +1609,11 @@ class OreMiner extends ModuleBase {
                     ? [COLORS.selectedFill, COLORS.selectedWire]
                     : waypoint.isDeployable
                       ? [COLORS.deployableFill, COLORS.deployableWire]
-                      : waypoint.type === 'Walk'
-                        ? [COLORS.walkFill, COLORS.walkWire]
-                        : [COLORS.teleportFill, COLORS.teleportWire];
+                      : waypoint.type === 'Warp'
+                        ? [COLORS.warpFill, COLORS.warpWire]
+                        : waypoint.type === 'Walk'
+                          ? [COLORS.walkFill, COLORS.walkWire]
+                          : [COLORS.teleportFill, COLORS.teleportWire];
             RenderUtils.drawStyledBox(new Vec3d(waypoint.pos.x, waypoint.pos.y, waypoint.pos.z), colors[0], colors[1], 2, false);
             if (this.editing) {
                 waypoint.minableBlocks.forEach((block) => {
