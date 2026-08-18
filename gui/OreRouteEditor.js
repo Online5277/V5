@@ -339,10 +339,17 @@ const drawEditor = (mouseX, mouseY) => {
 
     drawRect({ x: 0, y: 0, width: screenWidth, height: screenHeight, color: THEME.BG_OVERLAY });
     drawRoundedRectangleWithBorder({ ...panel, radius: 12, color: THEME.BG_WINDOW, borderWidth: 1, borderColor: THEME.BORDER_ACCENT });
-    layout.routeButton = { x: panel.x + 16, y: panel.y + 10, width: 92, height: 24 };
-    const undoButton = { x: panel.x + panel.width - 238, y: panel.y + 10, width: 62, height: 24 };
-    const routeInputX = layout.routeButton.x + layout.routeButton.width + 16;
-    const routeInput = { x: routeInputX, y: panel.y + 10, width: Math.max(110, undoButton.x - routeInputX - 16), height: 24 };
+    const compactHeader = panel.width < 500;
+    const sidePadding = compactHeader ? 8 : 16;
+    const buttonGap = compactHeader ? 4 : 8;
+    const sectionGap = compactHeader ? 4 : 16;
+    const headerY = panel.y + 10;
+    layout.routeButton = { x: panel.x + sidePadding, y: headerY, width: compactHeader ? 56 : 92, height: 24 };
+    const closeButton = { x: panel.x + panel.width - sidePadding - (compactHeader ? 50 : 82), y: headerY, width: compactHeader ? 50 : 82, height: 24 };
+    const saveButton = { x: closeButton.x - buttonGap - (compactHeader ? 44 : 62), y: headerY, width: compactHeader ? 44 : 62, height: 24 };
+    const undoButton = { x: saveButton.x - buttonGap - (compactHeader ? 44 : 62), y: headerY, width: compactHeader ? 44 : 62, height: 24 };
+    const routeInputX = layout.routeButton.x + layout.routeButton.width + sectionGap;
+    const routeInput = { x: routeInputX, y: headerY, width: Math.max(1, undoButton.x - sectionGap - routeInputX), height: 24 };
     drawInput('route', routeName, routeInput, 'route name');
     drawButton('Routes', layout.routeButton, () => {
         commitField();
@@ -358,7 +365,7 @@ const drawEditor = (mouseX, mouseY) => {
         expandedWaypoint = oreMiner.selectedWaypoint;
         syncFields();
     });
-    drawButton('Save', { x: panel.x + panel.width - 168, y: panel.y + 10, width: 62, height: 24 }, () => {
+    drawButton('Save', saveButton, () => {
         commitField();
         if (!oreMiner.loadedWaypoints.length) {
             status = 'Add a waypoint before saving.';
@@ -368,7 +375,7 @@ const drawEditor = (mouseX, mouseY) => {
         routeName = routeNameFromPath(oreMiner.loadedPath);
         status = `Saved ${routeName}.json`;
     });
-    drawButton('Close', { x: panel.x + panel.width - 98, y: panel.y + 10, width: 82, height: 24 }, () => Client.currentGui.close());
+    drawButton('Close', closeButton, () => Client.currentGui.close());
 
     const contentY = panel.y + 46;
     const footerY = panel.y + panel.height - 40;
