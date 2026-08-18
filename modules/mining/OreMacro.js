@@ -290,7 +290,7 @@ class OreMiner extends ModuleBase {
         this.message('  &fsave <name> &7- save the current route');
         this.message('  &flist | start | stop | status');
         this.message('  &fedit add <tp|walk> [index] &7- append, or insert and shift later waypoints');
-        this.message('  &fedit add warp <destination> &7- append a /warp command');
+        this.message('  &fedit add warp <destination> [index] &7- append, or insert and shift later waypoints');
         this.message('  &fedit add <mine|onetap|ronetap> [waypoint] &7- add the block under your crosshair');
         this.message('  &fedit deployable <waypoint> &7- toggle deployable placement');
         this.message('  &fedit remove <waypoint> &7- remove a waypoint');
@@ -355,19 +355,25 @@ class OreMiner extends ModuleBase {
 
     addWarpWaypoint(args) {
         const route = this.loadedWaypoints || (this.loadedWaypoints = []);
-        const warpCommand = args.join(' ').trim();
-        if (!warpCommand) return this.message('&cUsage: /v5 mining ore edit add warp <warp command>');
+        const warpCommand = String(args[0] || '').trim();
+        const index = args[1] === undefined ? route.length : Number.parseInt(args[1], 10);
+        if (!warpCommand || args.length > 2) return this.message('&cUsage: /v5 mining ore edit add warp <destination> [index]');
+        if (!Number.isInteger(index) || index < 0 || index > route.length) {
+            return this.message(`&cInvalid waypoint index. Valid range: 0-${route.length}`);
+        }
 
         this.recordUndo();
-        route.push({
+        route.splice(index, 0, {
             pos: { x: Math.floor(Player.getX()), y: Math.floor(Player.getY()) - 1, z: Math.floor(Player.getZ()) },
             type: 'Warp',
             warpCommand,
             minableBlocks: [],
             isDeployable: false,
         });
-        this.selectedWaypoint = route.length - 1;
-        this.message(`&aAdded Warp waypoint [${route.length - 1}] with command: &f/warp ${warpCommand}`);
+        this.selectedWaypoint = index;
+        const inserted = index < route.length - 1;
+        this.message(`&a${inserted ? 'Inserted' : 'Added'} Warp waypoint [${index}] with command: &f/warp ${warpCommand}`);
+        if (inserted) this.message(`&7Existing waypoint indexes ${index} and later were shifted forward.`);
     }
 
     addMineBlock(type, indexArg) {
