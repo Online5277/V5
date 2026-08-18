@@ -193,18 +193,18 @@ const drawWaypointList = (mouseX, mouseY, rect) => {
             waypoint.minableBlocks.forEach((block, mineIndex) => {
                 const flag = block.oneTap ? '1T' : block.rOneTap ? 'RT' : 'M';
                 drawText(`${flag} ${block.x}, ${block.y}, ${block.z}`, row.x + 24, mineY + MINE_ROW_HEIGHT / 2, FontSizes.SMALL, THEME.TEXT_MUTED);
-                const removeRect = { x: row.x + row.width - 24, y: mineY + 2, width: 18, height: 16 };
+                const removeRect = { x: row.x + row.width - 26, y: mineY + 2, width: 18, height: 16 };
                 if (removeRect.y + removeRect.height >= rect.y && removeRect.y <= rect.y + rect.height) {
                     drawButton('×', removeRect, () => oreMiner.removeRoutePoint(index, mineIndex));
                 }
                 mineY += MINE_ROW_HEIGHT;
             });
             const buttonY = row.y + height - 22;
-            const buttonWidth = (row.width - 36) / 3;
+            const buttonWidth = (row.width - 32) / 3;
             if (buttonY + 18 >= rect.y && buttonY <= rect.y + rect.height) {
                 drawButton('+ Mine', { x: row.x + 8, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('mine'));
-                drawButton('+ 1 Tap', { x: row.x + 14 + buttonWidth, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('onetap'));
-                drawButton('+ R Tap', { x: row.x + 20 + buttonWidth * 2, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('ronetap'));
+                drawButton('+ 1 Tap', { x: row.x + 16 + buttonWidth, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('onetap'));
+                drawButton('+ R Tap', { x: row.x + 24 + buttonWidth * 2, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('ronetap'));
             }
         }
         y += height + 4;
@@ -246,7 +246,7 @@ const drawDetails = (rect) => {
     );
     drawButton(
         'Walk',
-        { x: rect.x + 128, y: typeY, width: 58, height: 20 },
+        { x: rect.x + 130, y: typeY, width: 58, height: 20 },
         () =>
             mutateSelected((entry) => {
                 entry.type = 'Walk';
@@ -339,9 +339,11 @@ const drawEditor = (mouseX, mouseY) => {
 
     drawRect({ x: 0, y: 0, width: screenWidth, height: screenHeight, color: THEME.BG_OVERLAY });
     drawRoundedRectangleWithBorder({ ...panel, radius: 12, color: THEME.BG_WINDOW, borderWidth: 1, borderColor: THEME.BORDER_ACCENT });
-    const routeInput = { x: panel.x + 124, y: panel.y + 10, width: Math.max(110, panel.width - 380), height: 24 };
-    drawInput('route', routeName, routeInput, 'route name');
     layout.routeButton = { x: panel.x + 16, y: panel.y + 10, width: 92, height: 24 };
+    const undoButton = { x: panel.x + panel.width - 238, y: panel.y + 10, width: 62, height: 24 };
+    const routeInputX = layout.routeButton.x + layout.routeButton.width + 16;
+    const routeInput = { x: routeInputX, y: panel.y + 10, width: Math.max(110, undoButton.x - routeInputX - 16), height: 24 };
+    drawInput('route', routeName, routeInput, 'route name');
     drawButton('Routes', layout.routeButton, () => {
         commitField();
         routesOpen = !routesOpen;
@@ -350,7 +352,7 @@ const drawEditor = (mouseX, mouseY) => {
             routeScroll = clamp(routeScroll, 0, Math.max(0, routeNames.length - ROUTE_MENU_VISIBLE_ROWS));
         }
     });
-    drawButton('Undo', { x: panel.x + panel.width - 238, y: panel.y + 10, width: 62, height: 24 }, () => {
+    drawButton('Undo', undoButton, () => {
         commitField();
         oreMiner.undoRouteEdit();
         expandedWaypoint = oreMiner.selectedWaypoint;
@@ -380,8 +382,8 @@ const drawEditor = (mouseX, mouseY) => {
         height: listRect.height,
     });
 
-    drawButton('+ Tp at Current', { x: panel.x + 12, y: footerY + 6, width: 118, height: 24 }, () => addWaypoint('tp'));
-    drawButton('+ Walk at Current', { x: panel.x + 138, y: footerY + 6, width: 128, height: 24 }, () => addWaypoint('walk'));
+    drawButton('+ Tp at Current', { x: panel.x + 13, y: footerY + 6, width: 118, height: 24 }, () => addWaypoint('tp'));
+    drawButton('+ Walk at Current', { x: panel.x + 139, y: footerY + 6, width: 128, height: 24 }, () => addWaypoint('walk'));
     drawText(
         status || 'Changes stay in memory until Save is clicked.',
         panel.x + 280,
