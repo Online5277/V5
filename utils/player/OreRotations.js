@@ -63,6 +63,16 @@ class OreRotationController {
         return true;
     }
 
+    retargetVector(vector, speed) {
+        if (!this.active) return this.lookAtVector(vector, speed);
+
+        const player = Player.getPlayer();
+        if (!player || !vector || !this.refreshTrackedTarget(player, vector)) return false;
+        this.trackingVector = null;
+        if (Number.isFinite(speed)) this.speed = speed;
+        return true;
+    }
+
     stop() {
         this.active = false;
     }
