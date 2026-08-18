@@ -285,7 +285,6 @@ const drawDetails = (rect) => {
             FontSizes.REGULAR,
             THEME.TEXT_MUTED
         );
-        drawText('Expand this waypoint in the list to add or remove blocks.', rect.x + 16, actionY + 78, FontSizes.SMALL, THEME.TEXT_MUTED);
     }
 };
 
