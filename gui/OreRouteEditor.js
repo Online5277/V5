@@ -216,7 +216,16 @@ const drawWaypointList = (mouseX, mouseY, rect) => {
 
 const drawDetails = (rect) => {
     const waypoint = currentWaypoint();
-    drawRoundedRectangleWithBorder({ ...rect, radius: 7, color: THEME.BG_COMPONENT, borderWidth: 1, borderColor: THEME.BORDER });
+    drawRoundedRectangleWithBorder({
+        x: rect.x + 1,
+        y: rect.y + 1,
+        width: rect.width - 2,
+        height: rect.height - 2,
+        radius: 7,
+        color: THEME.BG_COMPONENT,
+        borderWidth: 1,
+        borderColor: THEME.BORDER,
+    });
     if (!waypoint) {
         drawText('No waypoint selected', rect.x + 16, rect.y + 22, FontSizes.HEADER, THEME.TEXT_MUTED);
         return;
