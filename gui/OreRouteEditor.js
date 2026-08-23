@@ -61,6 +61,11 @@ const commitField = () => {
     if (!waypoint) return;
     if (field === 'warp') {
         const value = fields.warp.trim();
+        if (!value) {
+            fields.warp = String(waypoint.warpCommand || '');
+            status = 'Warp destination is required.';
+            return;
+        }
         if (value !== waypoint.warpCommand) {
             oreMiner.recordUndo();
             waypoint.warpCommand = value;
@@ -93,11 +98,11 @@ const mutateSelected = (callback) => {
 
 const addWaypoint = (type) => {
     commitField();
-    oreMiner.addWaypoint(type);
-    oreMiner.selectedWaypoint = oreMiner.loadedWaypoints.length - 1;
+    if (type === 'warp') oreMiner.addWarpWaypoint([], false);
+    else oreMiner.addWaypoint(type);
     expandedWaypoint = oreMiner.selectedWaypoint;
     syncFields();
-    status = `Added ${type === 'tp' ? 'Tp' : 'Walk'} waypoint at your current position.`;
+    status = `Added ${type === 'tp' ? 'Tp' : type === 'walk' ? 'Walk' : 'Warp'} waypoint at your current position.`;
 };
 
 const addMineable = (type) => {
@@ -254,6 +259,15 @@ const drawDetails = (rect) => {
             }),
         waypoint.type === 'Walk'
     );
+    drawButton(
+        'Warp',
+        { x: rect.x + 196, y: typeY, width: 58, height: 20 },
+        () =>
+            mutateSelected((entry) => {
+                entry.type = 'Warp';
+            }),
+        waypoint.type === 'Warp'
+    );
 
     const inputWidth = Math.max(50, (rect.width - 48) / 3);
     const coordinateY = typeY + 44;
@@ -285,7 +299,7 @@ const drawDetails = (rect) => {
 
     if (waypoint.type === 'Warp') {
         drawText('Warp destination', rect.x + 16, actionY + 48, FontSizes.SMALL, THEME.TEXT_MUTED);
-        drawInput('warp', fields.warp, { x: rect.x + 16, y: actionY + 56, width: rect.width - 32, height: 22 }, 'forge');
+        drawInput('warp', fields.warp, { x: rect.x + 16, y: actionY + 56, width: rect.width - 32, height: 22 });
     } else {
         drawText(
             `${waypoint.minableBlocks.length} mineable block${waypoint.minableBlocks.length === 1 ? '' : 's'}`,
@@ -371,6 +385,13 @@ const drawEditor = (mouseX, mouseY) => {
             status = 'Add a waypoint before saving.';
             return;
         }
+        const invalidWarp = oreMiner.loadedWaypoints.findIndex((waypoint) => waypoint.type === 'Warp' && !String(waypoint.warpCommand || '').trim());
+        if (invalidWarp !== -1) {
+            oreMiner.selectedWaypoint = invalidWarp;
+            syncFields();
+            status = `Waypoint [${invalidWarp}] needs a warp destination.`;
+            return;
+        }
         oreMiner.saveRoute(routeName);
         routeName = routeNameFromPath(oreMiner.loadedPath);
         status = `Saved ${routeName}.json`;
@@ -389,15 +410,27 @@ const drawEditor = (mouseX, mouseY) => {
         height: listRect.height,
     });
 
-    drawButton('+ Tp at Current', { x: panel.x + 13, y: footerY + 6, width: 118, height: 24 }, () => addWaypoint('tp'));
-    drawButton('+ Walk at Current', { x: panel.x + 139, y: footerY + 6, width: 128, height: 24 }, () => addWaypoint('walk'));
-    drawText(
-        status || 'Changes stay in memory until Save is clicked.',
-        panel.x + 280,
-        footerY + 18,
-        FontSizes.SMALL,
-        status ? THEME.TEXT_LINK : THEME.TEXT_MUTED
+    const footerX = panel.x + 13;
+    const footerGap = 8;
+    const footerWidth = Math.min(390, panel.width - 26);
+    const footerButtonWidth = (footerWidth - footerGap * 2) / 3;
+    drawButton('+ Tp at Current', { x: footerX, y: footerY + 6, width: footerButtonWidth, height: 24 }, () => addWaypoint('tp'));
+    drawButton('+ Walk at Current', { x: footerX + footerButtonWidth + footerGap, y: footerY + 6, width: footerButtonWidth, height: 24 }, () =>
+        addWaypoint('walk')
     );
+    drawButton('+ Warp at Current', { x: footerX + (footerButtonWidth + footerGap) * 2, y: footerY + 6, width: footerButtonWidth, height: 24 }, () =>
+        addWaypoint('warp')
+    );
+    const statusX = footerX + footerWidth + 14;
+    if (statusX < panel.x + panel.width - 12) {
+        drawText(
+            status || 'Changes stay in memory until Save is clicked.',
+            statusX,
+            footerY + 18,
+            FontSizes.SMALL,
+            status ? THEME.TEXT_LINK : THEME.TEXT_MUTED
+        );
+    }
     drawRouteMenu(mouseX, mouseY, layout.routeButton);
 };
 

@@ -356,11 +356,11 @@ class OreMiner extends ModuleBase {
         if (inserted) this.message(`&7Existing waypoint indexes ${index} and later were shifted forward.`);
     }
 
-    addWarpWaypoint(args) {
+    addWarpWaypoint(args, requireDestination = true) {
         const route = this.loadedWaypoints || (this.loadedWaypoints = []);
         const warpCommand = String(args[0] || '').trim();
         const index = args[1] === undefined ? route.length : Number.parseInt(args[1], 10);
-        if (!warpCommand || args.length > 2) return this.message('&cUsage: /v5 mining ore edit add warp <destination> [index]');
+        if ((requireDestination && !warpCommand) || args.length > 2) return this.message('&cUsage: /v5 mining ore edit add warp <destination> [index]');
         if (!Number.isInteger(index) || index < 0 || index > route.length) {
             return this.message(`&cInvalid waypoint index. Valid range: 0-${route.length}`);
         }
