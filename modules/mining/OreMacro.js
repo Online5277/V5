@@ -453,6 +453,8 @@ class OreMiner extends ModuleBase {
     saveRoute(name) {
         const cleanName = sanitizeRouteName(name);
         if (!cleanName || !this.loadedWaypoints || !this.loadedWaypoints.length) return this.message('&cUsage: /v5 mining ore save <name>');
+        const invalidWarp = this.loadedWaypoints.findIndex((waypoint) => waypoint.type === 'Warp' && !String(waypoint.warpCommand || '').trim());
+        if (invalidWarp !== -1) return this.message(`&cWarp waypoint [${invalidWarp}] needs a destination before saving.`);
         Utils.writeConfigFile(`${ROUTE_DIR_RELATIVE}/${cleanName}.json`, this.loadedWaypoints);
         this.loadedPath = String(new File(ORE_ROUTES_DIR, `${cleanName}.json`).getAbsolutePath());
         this.undoStack = [];

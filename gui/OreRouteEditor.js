@@ -61,11 +61,6 @@ const commitField = () => {
     if (!waypoint) return;
     if (field === 'warp') {
         const value = fields.warp.trim();
-        if (!value) {
-            fields.warp = String(waypoint.warpCommand || '');
-            status = 'Warp destination is required.';
-            return;
-        }
         if (value !== waypoint.warpCommand) {
             oreMiner.recordUndo();
             waypoint.warpCommand = value;
@@ -473,6 +468,7 @@ routeEditorGui.registerScrolled((mouseX, mouseY, direction) => {
 routeEditorGui.registerClosed(() => {
     commitField();
     routesOpen = false;
+    if (oreMiner) oreMiner.editing = false;
     oreMiner = null;
 });
 
