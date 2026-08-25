@@ -21,7 +21,7 @@ const ETHERWARP_FACE_DEPTH = 0.01;
 const ETHERWARP_RAY_CLEARANCE = 0.06;
 const DEPLOYABLE_DETECTION_RADIUS = 4;
 const DEPLOYABLE_DETECTION_RADIUS_SQ = DEPLOYABLE_DETECTION_RADIUS * DEPLOYABLE_DETECTION_RADIUS;
-const DEPLOYABLE_ENTITY_NAMES = ['power orb', 'glacite lantern'];
+const DEPLOYABLE_ENTITY_NAMES = ['power orb', 'glacite lantern', "will-o'-wisp", 'mithril lantern', 'dwarven lantern', 'titanium lantern', "will o' wisp"];
 const ROUTE_DIR_RELATIVE = 'OreRoutes';
 const ORE_ROUTES_DIR = new File(V5ConfigFile.getParentFile(), ROUTE_DIR_RELATIVE);
 
@@ -548,7 +548,6 @@ class OreMiner extends ModuleBase {
                           ...normalized,
                           oneTap: !!block.oneTap,
                           rOneTap: !!block.rOneTap,
-                          isDeployable: !!block.isDeployable,
                       };
                   })
                   .filter(Boolean)
@@ -927,10 +926,7 @@ class OreMiner extends ModuleBase {
         const atWaypoint = dx * dx + dz * dz <= 0.5 && Math.abs(dy) <= 2;
 
         if (atWaypoint) {
-            const hasAction =
-                this.typeMineEnabled ||
-                waypoint.minableBlocks.some((block) => !block.isDeployable) ||
-                (waypoint.isDeployable && this.deployableWaypointsEnabled);
+            const hasAction = this.typeMineEnabled || waypoint.minableBlocks.length > 0 || (waypoint.isDeployable && this.deployableWaypointsEnabled);
             if (!hasAction) {
                 const nextIndex = (this.waypointIndex + 1) % this.loadedWaypoints.length;
                 const nextWaypoint = this.loadedWaypoints[nextIndex];
@@ -1635,7 +1631,7 @@ class OreMiner extends ModuleBase {
 
     shouldSkipBlock(block) {
         const blockName = this.getBlockName(block);
-        return block.isDeployable || !blockName || MiningBot.isAirOrBedrock(blockName);
+        return !blockName || MiningBot.isAirOrBedrock(blockName);
     }
 
     getBlockName(block) {

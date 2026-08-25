@@ -200,11 +200,17 @@ const drawWaypointList = (mouseX, mouseY, rect) => {
                 mineY += MINE_ROW_HEIGHT;
             });
             const buttonY = row.y + height - 22;
-            const buttonWidth = (row.width - 32) / 3;
+            const buttonWidth = (row.width - 40) / 4;
             if (buttonY + 18 >= rect.y && buttonY <= rect.y + rect.height) {
                 drawButton('+ Mine', { x: row.x + 8, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('mine'));
                 drawButton('+ 1 Tap', { x: row.x + 16 + buttonWidth, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('onetap'));
                 drawButton('+ R Tap', { x: row.x + 24 + buttonWidth * 2, y: buttonY, width: buttonWidth, height: 18 }, () => addMineable('ronetap'));
+                drawButton(
+                    waypoint.isDeployable ? '- Deployable' : '+ Deployable',
+                    { x: row.x + 32 + buttonWidth * 3, y: buttonY, width: buttonWidth, height: 18 },
+                    () => oreMiner.toggleDeployable(index),
+                    waypoint.isDeployable
+                );
             }
         }
         y += height + 4;
