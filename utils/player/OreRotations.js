@@ -8,13 +8,16 @@ class OreRotationController {
         this.targetPitch = 0;
         this.initialYawDistance = 0;
         this.initialPitchDistance = 0;
-        this.step = 0;
-        this.warmupSteps = 5;
         this.speed = 0.12;
         this.gcd = 0;
         this.lastUpdateAt = 0;
         this.yawRemainder = 0;
         this.pitchRemainder = 0;
+        this.yawVelocity = 0;
+        this.pitchVelocity = 0;
+        this.yawArc = 0;
+        this.pitchArc = 0;
+        this.arcDirection = 1;
         this.trackingVector = null;
 
         register('postRenderWorld', () => this.update());
@@ -37,13 +40,18 @@ class OreRotationController {
         this.initialPitchDistance = Math.abs(this.targetPitch - currentPitch);
 
         const distance = Math.hypot(this.initialYawDistance, this.initialPitchDistance);
-        this.warmupSteps = distance > 60 ? 1 : distance > 20 ? 3 : 5;
-        this.step = 0;
+        const arc = Math.min(0.75, distance * 0.02) * (this.arcDirection *= -1);
+        this.yawArc = this.initialYawDistance < 0.5 && this.initialPitchDistance > 1 ? arc : 0;
+        this.pitchArc = this.initialPitchDistance < 0.5 && this.initialYawDistance > 1 ? arc : 0;
+        if (this.targetPitch > 80) this.pitchArc = -Math.abs(this.pitchArc);
+        if (this.targetPitch < -80) this.pitchArc = Math.abs(this.pitchArc);
         this.speed = speed;
         this.gcd = RotationGCD.calculateGCD();
         this.lastUpdateAt = Date.now();
         this.yawRemainder = 0;
         this.pitchRemainder = 0;
+        this.yawVelocity = 0;
+        this.pitchVelocity = 0;
         this.trackingVector = null;
         this.active = true;
         return true;
@@ -90,11 +98,13 @@ class OreRotationController {
 
         const currentYaw = player.getYRot();
         const currentPitch = player.getXRot();
-        const deltaYaw = RotationGCD.angleDifference(this.targetYaw, currentYaw);
-        const deltaPitch = this.targetPitch - currentPitch;
+        let deltaYaw = RotationGCD.angleDifference(this.targetYaw, currentYaw);
+        let deltaPitch = this.targetPitch - currentPitch;
         const distance = Math.hypot(deltaYaw, deltaPitch);
 
         if (distance <= 0.5) {
+            this.yawVelocity = 0;
+            this.pitchVelocity = 0;
             if (this.trackingVector) return;
             this.stop();
             return;
@@ -103,17 +113,21 @@ class OreRotationController {
         this.initialYawDistance = Math.max(this.initialYawDistance, Math.abs(deltaYaw));
         this.initialPitchDistance = Math.max(this.initialPitchDistance, Math.abs(deltaPitch));
 
-        const updateScale = elapsedMs / 50;
-        const warmup = Math.min((this.step += updateScale) / this.warmupSteps, 1);
-        const baseSpeed = this.speed;
-        const yawFactor = this.initialYawDistance > 0.1 ? Math.pow(this.initialYawDistance / Math.max(0.1, Math.abs(deltaYaw)), 0.1) : 1;
-        const pitchFactor = this.initialPitchDistance > 0.1 ? Math.pow(this.initialPitchDistance / Math.max(0.1, Math.abs(deltaPitch)), 0.3) : 1;
-        const yawBlendAt50Ms = Math.max(0, Math.min(0.95, baseSpeed * warmup * yawFactor));
-        const pitchBlendAt50Ms = Math.max(0, Math.min(0.95, baseSpeed * warmup * pitchFactor));
-        const yawBlend = 1 - Math.pow(1 - yawBlendAt50Ms, updateScale);
-        const pitchBlend = 1 - Math.pow(1 - pitchBlendAt50Ms, updateScale);
-        const rawYawStep = deltaYaw * yawBlend + this.yawRemainder;
-        const rawPitchStep = deltaPitch * pitchBlend + this.pitchRemainder;
+        const speed = Math.max(0.01, Math.min(0.95, this.speed));
+        const frequency = (-Math.log(1 - speed) / 0.05) * 1.5;
+        const initialDistance = Math.hypot(this.initialYawDistance, this.initialPitchDistance);
+        const progress = initialDistance ? 1 - Math.min(1, Math.hypot(deltaYaw, deltaPitch) / initialDistance) : 1;
+        const arc = Math.sin(Math.PI * progress);
+        deltaYaw += this.yawArc * arc;
+        deltaPitch += this.pitchArc * arc;
+        const elapsedSeconds = elapsedMs / 1000;
+        const yaw = this.springStep(deltaYaw, this.yawVelocity, elapsedSeconds, frequency);
+        const pitch = this.springStep(deltaPitch, this.pitchVelocity, elapsedSeconds, frequency);
+        this.yawVelocity = yaw.velocity;
+        this.pitchVelocity = pitch.velocity;
+
+        const rawYawStep = yaw.step + this.yawRemainder;
+        const rawPitchStep = pitch.step + this.pitchRemainder;
         const yawStep = Math.round(rawYawStep / this.gcd) * this.gcd;
         const pitchStep = Math.round(rawPitchStep / this.gcd) * this.gcd;
         this.yawRemainder = rawYawStep - yawStep;
@@ -121,6 +135,16 @@ class OreRotationController {
 
         player.setYRot(currentYaw + yawStep);
         player.setXRot(RotationGCD.clampPitch(currentPitch + pitchStep));
+    }
+
+    springStep(delta, velocity, elapsedSeconds, frequency) {
+        const decay = Math.exp(-frequency * elapsedSeconds);
+        const change = -delta;
+        const temp = (velocity + frequency * change) * elapsedSeconds;
+        return {
+            step: delta + (change + temp) * decay,
+            velocity: (velocity - frequency * temp) * decay,
+        };
     }
 
     refreshTrackedTarget(player, vector) {
