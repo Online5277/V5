@@ -183,10 +183,10 @@ export class FarmingMacro extends ModuleBase {
         this.sprayonatorAction = action;
         Client.unpressKeys();
         Guis.setItemSlot(slot);
-        ScheduleTask(Utils.randomInt(farmingDelays.sprayonatorActionDelayMin, farmingDelays.sprayonatorActionDelayMax), () => {
+        ScheduleTask(farmingDelays.ticks('sprayonatorAction'), () => {
             if (this.sprayonatorAction !== action) return;
             Client.rightClick();
-            ScheduleTask(Utils.randomInt(farmingDelays.sprayonatorActionDelayMin, farmingDelays.sprayonatorActionDelayMax), () => {
+            ScheduleTask(farmingDelays.ticks('sprayonatorAction'), () => {
                 if (this.sprayonatorAction !== action) return;
                 Guis.setItemSlot(this.sprayonatorOriginalSlot);
                 this.startDelayTicks = Math.max(this.startDelayTicks, SPRAY_RESTORE_DELAY_TICKS);
@@ -283,7 +283,7 @@ export class FarmingMacro extends ModuleBase {
             const player = Player.getPlayer();
             if (this.enabled && player) this.resumeFarming(player, farmState, rotation);
         };
-        ScheduleTask(Utils.randomInt(farmingDelays.pestRestoreDelayMin, farmingDelays.pestRestoreDelayMax), () => {
+        ScheduleTask(farmingDelays.ticks('pestRestore'), () => {
             if (!farmingSettings.useMousemat) {
                 if (!this.rotateTo(rotation.yaw, rotation.pitch, resume)) resume();
                 return;

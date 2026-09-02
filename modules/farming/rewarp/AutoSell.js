@@ -1,5 +1,4 @@
 import { Guis } from '../../../utils/player/Inventory';
-import { Utils } from '../../../utils/Utils';
 import { farmingDelays } from '../FarmingDelays';
 
 const TARGETS = [
@@ -65,7 +64,7 @@ class AutoSell {
                     const item = items[i];
                     if (item && TARGETS.some((name) => ChatLib.removeFormatting(String(item.getName())).includes(name))) {
                         Guis.clickSlot(i, false, 'LEFT');
-                        this.nextActionAt = Date.now() + Utils.randomInt(farmingDelays.visitorAutoSellDelayMin, farmingDelays.visitorAutoSellDelayMax) * 50;
+                        this.nextActionAt = Date.now() + farmingDelays.random('visitorAutoSell');
                         return;
                     }
                 }
@@ -92,7 +91,7 @@ class AutoSell {
 
                 if (!Guis.clickItem('Sell Inventory Now')) return;
                 this.state = 'selling whole inventory';
-                this.nextActionAt = Date.now() + Utils.randomInt(farmingDelays.bazaarActionDelayMin, farmingDelays.bazaarActionDelayMax);
+                this.nextActionAt = Date.now() + farmingDelays.random('bazaarAction');
                 return;
             case 'selling whole inventory':
                 if (!Guis.clickItem('Selling whole inventory')) return;
