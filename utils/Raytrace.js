@@ -17,8 +17,6 @@ class VisibilityChecker {
     generateFaceOffsets() {
         let offsets = [];
 
-        offsets.push([0.5, 0.5, 0.5]);
-
         let faceConfigs = [
             { axis: 0, value: 0.05, otherAxes: [1, 2] },
             { axis: 0, value: 0.95, otherAxes: [1, 2] },
