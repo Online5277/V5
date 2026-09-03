@@ -16,13 +16,18 @@ export const SettingsMap = new Map();
 const getCategoryItems = (category) => category.items.reduce((acc, group) => acc.concat(group.type === 'separator' ? group.items : [group]), []);
 const getDirectComponentParentName = (category, component) =>
     category.name === 'Theme' ? 'Theme V2' : category.name === 'Settings' && component.sectionName ? component.sectionName : category.name;
+const forEachComponent = (components, callback) =>
+    components.forEach((component) => {
+        callback(component);
+        if (component instanceof Popup) forEachComponent(component.components, callback);
+    });
 
 function buildSettingsMapFromComponents() {
     SettingsMap.clear();
 
     Categories.categories.forEach((category) => {
         getCategoryItems(category).forEach((item) => {
-            item.components.forEach((component) => {
+            forEachComponent(item.components, (component) => {
                 const key = `${item.title}.${component.title}`;
                 storeComponentValue(key, component);
             });
@@ -34,7 +39,7 @@ function buildSettingsMapFromComponents() {
 
         // SETTINGS PAGE
         if (category.directComponents) {
-            category.directComponents.forEach((component) => {
+            forEachComponent(category.directComponents, (component) => {
                 const parentName = getDirectComponentParentName(category, component);
                 const key = `${parentName}.${component.title}`;
                 storeComponentValue(key, component);
@@ -87,13 +92,13 @@ export const applySettings = () => {
                 applyModuleEnabled(item.title, enabled);
             }
 
-            item.components.forEach((component) => {
+            forEachComponent(item.components, (component) => {
                 triggerComponentCallback(item.title, component);
             });
         });
 
         if (category.directComponents) {
-            category.directComponents.forEach((component) => {
+            forEachComponent(category.directComponents, (component) => {
                 const parentName = getDirectComponentParentName(category, component);
                 triggerComponentCallback(parentName, component);
             });
@@ -136,14 +141,14 @@ export const loadSettings = () => {
             getCategoryItems(category).forEach((item) => {
                 const savedItemSettings = settings[item.title];
                 if (savedItemSettings) {
-                    item.components.forEach((component) => {
+                    forEachComponent(item.components, (component) => {
                         loadComponentValue(component, savedItemSettings[component.title]);
                     });
                 }
             });
 
             if (category.directComponents) {
-                category.directComponents.forEach((component) => {
+                forEachComponent(category.directComponents, (component) => {
                     const parentName = getDirectComponentParentName(category, component);
                     const savedCategorySettings = settings[parentName];
                     if (savedCategorySettings) {
