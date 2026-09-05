@@ -475,7 +475,13 @@ class RefuelService {
         };
 
         this.reset();
-        register('tick', () => this.tick());
+        register('tick', () => {
+            try {
+                this.tick();
+            } catch (error) {
+                this.abort('Refueling error: ' + error);
+            }
+        });
     }
 
     reset() {
@@ -492,6 +498,7 @@ class RefuelService {
         this.targetHotbarSlot = -1;
         this.swapState = 0;
         this.finalSuccess = false;
+        this.allowNpc = true;
     }
 
     setState(nextState, waitTicks = 0, timeoutTicks = null) {
@@ -500,7 +507,7 @@ class RefuelService {
         this.timeoutTicks = timeoutTicks;
     }
 
-    refuel(callback) {
+    refuel(callback, { allowNpc = true } = {}) {
         if (this.state !== this.STATES.IDLE) {
             Chat.message('Refuel already running!');
             if (callback) callback(false);
@@ -508,12 +515,12 @@ class RefuelService {
         }
 
         this.callback = callback;
+        this.allowNpc = allowNpc;
         this.setState(this.STATES.FIND_ABIPHONE);
     }
 
     tick() {
         if (this.state === this.STATES.IDLE) return;
-
         if (this.waitTicks > 0) {
             this.waitTicks--;
             return;
@@ -587,6 +594,7 @@ class RefuelService {
                     this.targetHotbarSlot = targetSlot;
                     this.setState(this.STATES.OPEN_PLAYER_INV_SWAP, 0);
                 } else {
+                    if (!this.allowNpc) return this.fail('Abiphone not found; NPC refueling is disabled.');
                     Chat.message('Abiphone not found. Walking to Drill Mechanic...');
                     this.setState(this.STATES.WALK_TO_MECHANIC);
                 }
@@ -787,6 +795,7 @@ class RefuelService {
     }
 
     finish(success) {
+        Guis.closeInv();
         if (this.originalAbiphoneSlot !== -1) {
             this.finalSuccess = success;
             this.setState(this.STATES.OPEN_PLAYER_INV_RESTORE, 10);
@@ -797,8 +806,20 @@ class RefuelService {
 
     finalCallback(success) {
         const cb = this.callback;
+        if (this.isPathing) Pathfinder.resetPath();
+        if (this.npcRotationPending) Rotations.stop();
         this.reset();
         if (cb) cb(success);
+    }
+
+    abort(message) {
+        if (this.state === this.STATES.IDLE) return;
+        Chat.message(message);
+        try {
+            Guis.closeInv();
+        } finally {
+            this.finalCallback(false);
+        }
     }
 }
 
@@ -1043,8 +1064,8 @@ export const MiningUtils = {
             drill: bestTool,
         };
     },
-    doRefueling: function (isComm, callback) {
-        refueler.refuel(callback);
+    doRefueling: function (isComm, callback, options = {}) {
+        refueler.refuel(callback, options);
     },
     MaxGreatExplorer: function (callback) {
         explorer.upgrade(callback);
