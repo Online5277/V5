@@ -504,8 +504,14 @@ class OreMiner extends ModuleBase {
             return false;
         }
         if (!Utils.writeConfigFile(`${ROUTE_DIR_RELATIVE}/${cleanName}.json`, this.loadedWaypoints)) return false;
+        const selectedWaypoint = this.selectedWaypoint;
         this.loadedPath = String(new File(ORE_ROUTES_DIR, `${cleanName}.json`).getAbsolutePath());
         this.undoStack = [];
+        if (!this.routeActive && !this.loadRoute(cleanName)) {
+            this.message(`&cSaved ${cleanName}, but failed to reload it.`);
+            return false;
+        }
+        this.selectedWaypoint = Math.min(Math.max(0, selectedWaypoint), this.loadedWaypoints.length - 1);
         this.message(`&aSaved ${this.loadedWaypoints.length} waypoints as &f${cleanName}&a.`);
         return true;
     }
@@ -1824,22 +1830,20 @@ class OreMiner extends ModuleBase {
                     RenderUtils.drawText(`${type}[${mineIndex}]`, new Vec3d(block.x + 0.5, block.y + 1.1, block.z + 0.5), 1, true, false, true);
                 });
             }
-            if (this.editing) {
-                waypoint.minableBlocks.forEach((block) => {
-                    const mineColors = block.oneTap
-                        ? [COLORS.oneTapFill, COLORS.oneTapWire]
-                        : block.rOneTap
-                          ? [COLORS.rOneTapFill, COLORS.rOneTapWire]
-                          : [COLORS.mineFill, COLORS.mineWire];
-                    RenderUtils.drawStyledBox(
-                        new Vec3d(block.x, block.y, block.z),
-                        mineColors[0],
-                        mineColors[1],
-                        index === this.selectedWaypoint ? 3 : 2,
-                        false
-                    );
-                });
-            }
+            waypoint.minableBlocks.forEach((block) => {
+                const mineColors = block.oneTap
+                    ? [COLORS.oneTapFill, COLORS.oneTapWire]
+                    : block.rOneTap
+                      ? [COLORS.rOneTapFill, COLORS.rOneTapWire]
+                      : [COLORS.mineFill, COLORS.mineWire];
+                RenderUtils.drawStyledBox(
+                    new Vec3d(block.x, block.y, block.z),
+                    mineColors[0],
+                    mineColors[1],
+                    index === this.selectedWaypoint ? 3 : 2,
+                    false
+                );
+            });
         });
         if (this.currentRenderTarget) {
             const { x, y, z } = this.currentRenderTarget;
